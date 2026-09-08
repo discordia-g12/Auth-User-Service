@@ -1,0 +1,24 @@
+# Git
+.git
+.gitignore
+
+# Virtual environments
+venv/
+env/
+.venv/
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+
+# Tests & logs
+.pytest_cache/
+.coverage
+*.log
+
+# Docker
+Dockerfile
+docker-compose.yml
