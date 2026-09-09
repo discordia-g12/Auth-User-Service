@@ -10,7 +10,6 @@ class Settings(BaseSettings):
 
     @property
     def database_url(self) -> str:
-        # Usamos el driver síncrono psycopg2
         return f"postgresql+asyncpg://{self.database_user}:{self.database_password}@{self.database_host}:{self.database_port}/{self.database_name}"
 
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
