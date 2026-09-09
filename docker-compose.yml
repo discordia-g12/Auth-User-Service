@@ -7,13 +7,20 @@ services:
     volumes:
       - .:/app
     environment:
-      - DATABASE_URL=postgresql://postgres:postgres@auth_db:5432/auth_db
+      - ENVIRONMENT=development
+      - HOST=0.0.0.0
+      - PORT=8000
+      - DATABASE_HOST=auth_db
+      - DATABASE_USER=postgres
+      - DATABASE_PASSWORD=postgres
+      - DATABASE_NAME=auth_db
+      - DATABASE_PORT=5432
     depends_on:
       auth_db:
         condition: service_healthy
 
   auth_db:
-    image: postgres:15-alpine
+    image: postgres:16-alpine
     container_name: auth-user-db
     expose:
       - "5432"

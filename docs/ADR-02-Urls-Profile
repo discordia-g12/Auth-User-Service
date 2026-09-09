@@ -1,0 +1,18 @@
+## ADR 02: Gestión y Almacenamiento de Avatares
+
+**Contexto:**
+El perfil del usuario incluye una foto de avatar visible públicamente. Por restricciones de la materia, los binarios no deben persistirse en bases de datos ni en el sistema de archivos del servidor.
+
+**Decisión:**
+Se externalizará la gestión de medios siguiendo estos lineamientos:
+
+* **Almacenamiento de Objetos:** Las imágenes se guardarán en un servicio en la nube especializado como AWS S3 o Cloudinary.
+
+
+* **Validación de Formatos:** El *Auth & User Service* solo aceptará extensiones JPEG, PNG o WebP, validando que el archivo no supere el límite de 5 MB.
+
+
+* **Persistencia de URL:** Las bases de datos (como PostgreSQL) solo guardarán la cadena de texto con la URL pública generada para acceder a la imagen.
+
+
+* **Sincronización de Perfiles:** Al actualizar el avatar, el servicio emitirá el evento `UserProfileUpdated` a través de RabbitMQ. Esto asegura que servicios como el *Chat Engine* puedan actualizar el avatar desnormalizado en su historial de MongoDB.
