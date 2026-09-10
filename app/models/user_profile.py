@@ -1,6 +1,8 @@
-from sqlalchemy import Column, String, ForeignKey
-from app.db.base import Base
+from sqlalchemy import Column, ForeignKey, String
 from sqlalchemy.orm import relationship
+
+from app.db.base import Base
+
 
 class UserProfile(Base):
     __tablename__ = "user_profiles"
