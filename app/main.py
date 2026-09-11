@@ -1,6 +1,7 @@
-from fastapi import FastAPI, Depends, Response, status
+from fastapi import Depends, FastAPI, Response, status
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
+
 from app.db.session import get_db
 
 app = FastAPI(title="Auth User Service")
