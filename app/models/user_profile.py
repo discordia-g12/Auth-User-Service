@@ -1,16 +1,23 @@
-from sqlalchemy import Column, String, ForeignKey
+from sqlalchemy import ForeignKey, String
+from sqlalchemy.orm import Mapped, mapped_column, relationship
+
 from app.db.base import Base
-from sqlalchemy.orm import relationship
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from app.models.user import User
+
 
 class UserProfile(Base):
+    """User profile entity containing public Discordia user representation."""
+
     __tablename__ = "user_profiles"
 
-    user_id = Column(String, ForeignKey("users.id", ondelete="CASCADE"), primary_key=True)
-    username = Column(String, unique=True, index=True, nullable=False) 
-    avatar_url = Column(String, nullable=True)
-    bio = Column(String, nullable=True) 
-    
-    activity_status = Column(String, default="offline") 
-    custom_status = Column(String, nullable=True)
+    user_id: Mapped[str] = mapped_column(String, ForeignKey("users.id", ondelete="CASCADE"), primary_key=True)
+    username: Mapped[str] = mapped_column(String, unique=True, index=True, nullable=False)
+    avatar_url: Mapped[str | None] = mapped_column(String, nullable=True)
+    bio: Mapped[str | None] = mapped_column(String, nullable=True)
+    activity_status: Mapped[str] = mapped_column(String, default="offline")
+    custom_status: Mapped[str | None] = mapped_column(String, nullable=True)
 
-    user = relationship("User", back_populates="profile")
+    user: Mapped["User"] = relationship("User", back_populates="profile")

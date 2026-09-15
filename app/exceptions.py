@@ -1,0 +1,87 @@
+from typing import Any
+
+
+class AppException(Exception):
+    status_code: int = 500
+    title: str = "Internal Server Error"
+
+    def __init__(self, detail: str, status_code: int | None = None, title: str | None = None, invalid_params: list[dict[str, Any]] | None = None):
+        super().__init__(detail)
+        self.detail = detail
+        if status_code is not None:
+            self.status_code = status_code
+        if title is not None:
+            self.title = title
+        self.invalid_params = invalid_params
+
+
+class BadRequestError(AppException):
+    status_code = 400
+    title = "Bad Request"
+
+
+class UnauthorizedError(AppException):
+    status_code = 401
+    title = "Unauthorized"
+
+    def __init__(self, detail: str = "Unauthenticated user identity. Gateway token verification is required."):
+        super().__init__(detail)
+
+
+class ForbiddenError(AppException):
+    status_code = 403
+    title = "Forbidden"
+
+    def __init__(self, detail: str = "Forbidden access."):
+        super().__init__(detail)
+
+
+class NotFoundError(AppException):
+    status_code = 404
+    title = "Not Found"
+
+    def __init__(self, detail: str = "Resource not found."):
+        super().__init__(detail)
+
+
+class ConflictError(AppException):
+    status_code = 409
+    title = "Conflict"
+
+    def __init__(self, detail: str = "Resource conflict."):
+        super().__init__(detail)
+
+
+class UnprocessableEntityError(AppException):
+    status_code = 422
+    title = "Validation Error"
+
+
+# Domain-Specific Exceptions
+class UserAlreadyExistsError(ConflictError):
+    def __init__(self, detail: str = "User already has a registered profile on the platform."):
+        super().__init__(detail)
+
+
+class UsernameConflictError(ConflictError):
+    def __init__(self, username: str):
+        super().__init__(f"Username '{username}' is already in use.")
+
+
+class UserProfileNotFoundError(NotFoundError):
+    def __init__(self, detail: str = "User profile has not been initialized."):
+        super().__init__(detail)
+
+
+__all__ = [
+    "AppException",
+    "BadRequestError",
+    "ConflictError",
+    "ForbiddenError",
+    "NotFoundError",
+    "UnauthorizedError",
+    "UnprocessableEntityError",
+    "UserAlreadyExistsError",
+    "UserProfileNotFoundError",
+    "UsernameConflictError",
+]
