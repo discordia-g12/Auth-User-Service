@@ -2,9 +2,11 @@ from fastapi import Depends, FastAPI, Response, status
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.api.v1 import api_router
 from app.db.session import get_db
 
 app = FastAPI(title="Auth User Service")
+app.include_router(api_router, prefix="/api/v1")
 
 @app.get("/")
 def read_root():
