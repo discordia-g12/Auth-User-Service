@@ -5,7 +5,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import AuthenticatedIdentity, get_authenticated_identity
 from app.db.session import get_db
-from app.exceptions import BadRequestError
+from app.exceptions import BadRequestError, EmailNotVerifiedError
 from app.schemas.problem import ProblemDetails
 from app.schemas.user import CreateUserProfileRequest, UserProfileResponse
 from app.services.user_service import UserService
@@ -33,6 +33,10 @@ user_service = UserService()
             "model": ProblemDetails,
             "description": "Unauthenticated identity",
         },
+        status.HTTP_403_FORBIDDEN: {
+            "model": ProblemDetails,
+            "description": "Email address not verified in the identity provider",
+        },
         status.HTTP_409_CONFLICT: {
             "model": ProblemDetails,
             "description": "User already registered or username in use",
@@ -51,6 +55,10 @@ async def register_user_profile(
     """Provisions profile for authenticated user on Discordia platform."""
     if not identity.email:
         raise BadRequestError("User email is required to register an account in Discordia.")
+
+    # Second barrier. The primary one is the Auth0 Post Login Action
+    if not identity.email_verified:
+        raise EmailNotVerifiedError()
 
     return await user_service.register_user_profile(
         session=db,

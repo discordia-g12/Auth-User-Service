@@ -18,10 +18,15 @@ __all__ = [
 
 
 def problem_response(
-    request: Request, status_code: int, title: str, detail: str, invalid_params: list[dict[str, Any]] | None = None
+    request: Request,
+    status_code: int,
+    title: str,
+    detail: str,
+    invalid_params: list[dict[str, Any]] | None = None,
+    problem_type: str = "about:blank",
 ) -> JSONResponse:
     content: dict[str, Any] = {
-        "type": "about:blank",
+        "type": problem_type,
         "title": title,
         "status": status_code,
         "detail": detail,
@@ -33,7 +38,7 @@ def problem_response(
 
 
 async def app_exception_handler(request: Request, exc: AppException) -> JSONResponse:
-    return problem_response(request, exc.status_code, exc.title, exc.detail, exc.invalid_params)
+    return problem_response(request, exc.status_code, exc.title, exc.detail, exc.invalid_params, exc.type)
 
 
 async def validation_exception_handler(request: Request, exc: RequestValidationError) -> JSONResponse:

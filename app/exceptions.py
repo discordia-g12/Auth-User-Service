@@ -1,9 +1,12 @@
 from typing import Any
 
+PROBLEM_TYPE_BASE = "https://discordia.app/problems"
+
 
 class AppException(Exception):
     status_code: int = 500
     title: str = "Internal Server Error"
+    type: str = "about:blank"
 
     def __init__(
         self,
@@ -74,15 +77,27 @@ class UsernameConflictError(ConflictError):
         super().__init__(f"Username '{username}' is already in use.")
 
 
+class EmailNotVerifiedError(ForbiddenError):
+    type = f"{PROBLEM_TYPE_BASE}/email-not-verified"
+
+    def __init__(
+        self,
+        detail: str = "Email address must be verified before registering in Discordia. Check your inbox.",
+    ):
+        super().__init__(detail)
+
+
 class UserProfileNotFoundError(NotFoundError):
     def __init__(self, detail: str = "User profile has not been initialized."):
         super().__init__(detail)
 
 
 __all__ = [
+    "PROBLEM_TYPE_BASE",
     "AppException",
     "BadRequestError",
     "ConflictError",
+    "EmailNotVerifiedError",
     "ForbiddenError",
     "NotFoundError",
     "UnauthorizedError",
