@@ -74,6 +74,14 @@ class UsernameConflictError(ConflictError):
         super().__init__(f"Username '{username}' is already in use.")
 
 
+class EmailNotVerifiedError(ForbiddenError):
+    def __init__(
+        self,
+        detail: str = "Email address must be verified before registering in Discordia. Check your inbox.",
+    ):
+        super().__init__(detail)
+
+
 class UserProfileNotFoundError(NotFoundError):
     def __init__(self, detail: str = "User profile has not been initialized."):
         super().__init__(detail)
@@ -83,6 +91,7 @@ __all__ = [
     "AppException",
     "BadRequestError",
     "ConflictError",
+    "EmailNotVerifiedError",
     "ForbiddenError",
     "NotFoundError",
     "UnauthorizedError",

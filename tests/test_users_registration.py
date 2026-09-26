@@ -83,6 +83,74 @@ async def test_register_profile_missing_email(client: AsyncClient):
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "verified_header",
+    [
+        None,  # Gateway did not propagate the flag (e.g. Auth0 Action missing the claim)
+        "false",
+        "",
+        "1",  # only the literal "true" is accepted: fail closed on anything ambiguous
+        "yes",
+    ],
+)
+async def test_register_profile_unverified_email_forbidden(
+    client: AsyncClient, db_session: AsyncSession, verified_header: str | None
+):
+    headers = {"X-User-Id": "auth0|unverified-user", "X-User-Email": "victim@discordia.com"}
+    if verified_header is not None:
+        headers["X-User-Email-Verified"] = verified_header
+
+    response = await client.post("/api/v1/users/me", json={"username": "squatter"}, headers=headers)
+
+    assert response.status_code == 403
+    assert response.headers["content-type"] == "application/problem+json"
+    data = response.json()
+    assert data["status"] == 403
+    assert "must be verified" in data["detail"]
+
+    # Nothing may be persisted: the email must stay free for its real owner.
+    user = (await db_session.execute(select(User).where(User.email == "victim@discordia.com"))).scalar_one_or_none()
+    assert user is None
+    events = (await db_session.execute(select(OutboxEvent))).scalars().all()
+    assert events == []
+
+
+@pytest.mark.asyncio
+async def test_register_profile_verified_header_is_case_insensitive(client: AsyncClient):
+    headers = {
+        "X-User-Id": "auth0|case-user",
+        "X-User-Email": "case@discordia.com",
+        "X-User-Email-Verified": "True",
+    }
+    response = await client.post("/api/v1/users/me", json={"username": "case_user"}, headers=headers)
+    assert response.status_code == 201
+
+
+@pytest.mark.asyncio
+async def test_unverified_user_blocked_email_is_still_available_for_owner(client: AsyncClient):
+    """CA2 guard: a squatting attempt with an unverified email must not block the legitimate owner."""
+    squatter = {"X-User-Id": "auth0|squatter", "X-User-Email": "owner@discordia.com", "X-User-Email-Verified": "false"}
+    owner = {"X-User-Id": "auth0|owner", "X-User-Email": "owner@discordia.com", "X-User-Email-Verified": "true"}
+
+    blocked = await client.post("/api/v1/users/me", json={"username": "squatter"}, headers=squatter)
+    assert blocked.status_code == 403
+
+    registered = await client.post("/api/v1/users/me", json={"username": "real_owner"}, headers=owner)
+    assert registered.status_code == 201
+
+
+@pytest.mark.asyncio
+async def test_get_my_profile_does_not_require_verified_email(client: AsyncClient, auth_headers: dict[str, str]):
+    """Verification gates provisioning only; reading an existing profile must keep working."""
+    created = await client.post("/api/v1/users/me", json={"username": "reader"}, headers=auth_headers)
+    assert created.status_code == 201
+
+    headers = {"X-User-Id": auth_headers["X-User-Id"]}
+    res = await client.get("/api/v1/users/me", headers=headers)
+    assert res.status_code == 200
+
+
+@pytest.mark.asyncio
 async def test_register_profile_duplicate_user_id_conflict(client: AsyncClient, auth_headers: dict[str, str]):
     payload = {"username": "first_user"}
     first_res = await client.post("/api/v1/users/me", json=payload, headers=auth_headers)
@@ -105,6 +173,7 @@ async def test_register_profile_duplicate_username_conflict(client: AsyncClient,
     user2_headers = {
         "X-User-Id": "auth0|user-2",
         "X-User-Email": "other@discordia.com",
+        "X-User-Email-Verified": "true",
     }
     res2 = await client.post("/api/v1/users/me", json={"username": "unique_tag"}, headers=user2_headers)
     assert res2.status_code == 409

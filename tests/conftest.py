@@ -67,4 +67,5 @@ def auth_headers() -> dict[str, str]:
     return {
         "X-User-Id": "auth0|test-user-123456",
         "X-User-Email": "tester@discordia.com",
+        "X-User-Email-Verified": "true",
     }
