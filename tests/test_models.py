@@ -1,23 +1,18 @@
-import uuid
+import pytest
+from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.db.session import AsyncSessionLocal
 from app.models.user import User
 
-# NOTE: UserProfile is intentionally not tested here — its table (user_profiles)
-# doesn't exist yet in the current migration (23753b693bdd_initial.py), and
-# `is_suspended` is missing from the `users` table too. Both are a pre-existing
-# model/migration drift, out of scope for the CI/CD issue this test file was
-# added for. Tracked separately; do not add coverage for them until the
-# migration is fixed, or these tests will fail against a freshly-migrated DB.
 
+@pytest.mark.asyncio
+async def test_user_default_values(db_session: AsyncSession):
+    user = User(id="auth0|test-user", email="user@example.com")
+    db_session.add(user)
+    await db_session.flush()
 
-async def test_user_default_values():
-    async with AsyncSessionLocal() as session:
-        user = User(email=f"{uuid.uuid4()}@example.com", hashed_password="hashed")
-        session.add(user)
-        await session.flush()
+    assert user.id == "auth0|test-user"
+    assert user.email == "user@example.com"
+    assert user.is_active is True
+    assert user.is_suspended is False
 
-        assert uuid.UUID(user.id)
-        assert user.is_active is True
-
-        await session.rollback()
+    await db_session.rollback()
