@@ -14,7 +14,9 @@ class UserService:
     def __init__(self, user_repo: UserRepository | None = None):
         self.user_repo = user_repo or UserRepository()
 
-    async def register_user_profile(self, session: AsyncSession, user_id: str, email: str, request: CreateUserProfileRequest) -> UserProfileResponse:
+    async def register_user_profile(
+        self, session: AsyncSession, user_id: str, email: str, request: CreateUserProfileRequest
+    ) -> UserProfileResponse:
         """Initializes business user record and profile for the authenticated identity."""
         no_null_bytes(request.username, "username")
         no_null_bytes(request.bio, "bio")

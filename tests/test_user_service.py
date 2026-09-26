@@ -75,4 +75,3 @@ async def test_user_service_profile_not_found_error(db_session: AsyncSession):
     service = UserService()
     with pytest.raises(UserProfileNotFoundError):
         await service.get_my_profile(session=db_session, user_id="auth0|non-existent")
-

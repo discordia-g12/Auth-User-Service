@@ -1,8 +1,6 @@
 import pytest
 from httpx import AsyncClient
 
-from app.exceptions import ConflictError
-
 
 @pytest.mark.asyncio
 async def test_app_exception_rfc7807_format(client: AsyncClient, auth_headers: dict[str, str]):
@@ -29,4 +27,3 @@ async def test_not_found_endpoint_rfc7807_format(client: AsyncClient):
     assert data["type"] == "about:blank"
     assert data["status"] == 404
     assert data["instance"] == "/api/v1/non-existent-endpoint"
-

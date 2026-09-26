@@ -120,13 +120,17 @@ async def test_register_profile_validation_invalid_username(client: AsyncClient,
     assert res_short.status_code == 422
 
     # Invalid characters (spaces, special characters)
-    res_invalid_chars = await client.post("/api/v1/users/me", json={"username": "invalid name with spaces!"}, headers=auth_headers)
+    res_invalid_chars = await client.post(
+        "/api/v1/users/me", json={"username": "invalid name with spaces!"}, headers=auth_headers
+    )
     assert res_invalid_chars.status_code == 422
 
 
 @pytest.mark.asyncio
 async def test_register_profile_validation_null_bytes(client: AsyncClient, auth_headers: dict[str, str]):
-    res = await client.post("/api/v1/users/me", json={"username": "safe_name", "bio": "bad\x00byte"}, headers=auth_headers)
+    res = await client.post(
+        "/api/v1/users/me", json={"username": "safe_name", "bio": "bad\x00byte"}, headers=auth_headers
+    )
     assert res.status_code == 400
     data = res.json()
     assert "cannot contain null characters" in data["detail"]

@@ -13,4 +13,3 @@ def test_no_null_bytes_invalid():
     with pytest.raises(BadRequestError) as exc_info:
         no_null_bytes("invalid\x00string", "test_field")
     assert "Field 'test_field' cannot contain null characters." in str(exc_info.value)
-

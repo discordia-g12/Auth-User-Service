@@ -23,4 +23,3 @@ async def test_readiness_probe(client: AsyncClient):
     response = await client.get("/readyz")
     assert response.status_code == 200
     assert response.json() == {"status": "ready"}
-

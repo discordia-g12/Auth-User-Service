@@ -17,8 +17,16 @@ __all__ = [
 ]
 
 
-def problem_response(request: Request, status_code: int, title: str, detail: str, invalid_params: list[dict[str, Any]] | None = None) -> JSONResponse:
-    content: dict[str, Any] = {"type": "about:blank", "title": title, "status": status_code, "detail": detail, "instance": request.url.path}
+def problem_response(
+    request: Request, status_code: int, title: str, detail: str, invalid_params: list[dict[str, Any]] | None = None
+) -> JSONResponse:
+    content: dict[str, Any] = {
+        "type": "about:blank",
+        "title": title,
+        "status": status_code,
+        "detail": detail,
+        "instance": request.url.path,
+    }
     if invalid_params:
         content["invalid_params"] = invalid_params
     return JSONResponse(status_code=status_code, content=content, media_type="application/problem+json")
@@ -29,13 +37,23 @@ async def app_exception_handler(request: Request, exc: AppException) -> JSONResp
 
 
 async def validation_exception_handler(request: Request, exc: RequestValidationError) -> JSONResponse:
-    invalid_params = [{"name": ".".join(str(loc) for loc in err["loc"] if loc != "body") or "payload", "reason": err["msg"]} for err in exc.errors()]
-    return problem_response(request, status.HTTP_422_UNPROCESSABLE_ENTITY, "Validation Error", "One or more boundary validation rules failed.", invalid_params)
+    invalid_params = [
+        {"name": ".".join(str(loc) for loc in err["loc"] if loc != "body") or "payload", "reason": err["msg"]}
+        for err in exc.errors()
+    ]
+    return problem_response(
+        request,
+        status.HTTP_422_UNPROCESSABLE_ENTITY,
+        "Validation Error",
+        "One or more boundary validation rules failed.",
+        invalid_params,
+    )
 
 
 async def http_exception_handler(request: Request, exc: StarletteHTTPException) -> JSONResponse:
     title = HTTPStatus(exc.status_code).phrase if exc.status_code in HTTPStatus._value2member_map_ else "HTTP Error"
     return problem_response(request, exc.status_code, title, str(exc.detail))
+
 
 def register_exception_handlers(app: FastAPI) -> None:
     """Wire exceptions to their RFC 7807 handlers."""

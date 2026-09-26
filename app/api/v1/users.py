@@ -43,7 +43,11 @@ user_service = UserService()
         },
     },
 )
-async def register_user_profile(payload: CreateUserProfileRequest, identity: Annotated[AuthenticatedIdentity, Depends(get_authenticated_identity)], db: Annotated[AsyncSession, Depends(get_db)]) -> UserProfileResponse:
+async def register_user_profile(
+    payload: CreateUserProfileRequest,
+    identity: Annotated[AuthenticatedIdentity, Depends(get_authenticated_identity)],
+    db: Annotated[AsyncSession, Depends(get_db)],
+) -> UserProfileResponse:
     """Provisions profile for authenticated user on Discordia platform."""
     if not identity.email:
         raise BadRequestError("User email is required to register an account in Discordia.")
@@ -77,7 +81,10 @@ async def register_user_profile(payload: CreateUserProfileRequest, identity: Ann
         },
     },
 )
-async def get_my_profile(identity: Annotated[AuthenticatedIdentity, Depends(get_authenticated_identity)], db: Annotated[AsyncSession, Depends(get_db)]) -> UserProfileResponse:
+async def get_my_profile(
+    identity: Annotated[AuthenticatedIdentity, Depends(get_authenticated_identity)],
+    db: Annotated[AsyncSession, Depends(get_db)],
+) -> UserProfileResponse:
     """Retrieves profile of the currently authenticated user."""
     return await user_service.get_my_profile(
         session=db,

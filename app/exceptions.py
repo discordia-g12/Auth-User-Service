@@ -5,7 +5,13 @@ class AppException(Exception):
     status_code: int = 500
     title: str = "Internal Server Error"
 
-    def __init__(self, detail: str, status_code: int | None = None, title: str | None = None, invalid_params: list[dict[str, Any]] | None = None):
+    def __init__(
+        self,
+        detail: str,
+        status_code: int | None = None,
+        title: str | None = None,
+        invalid_params: list[dict[str, Any]] | None = None,
+    ):
         super().__init__(detail)
         self.detail = detail
         if status_code is not None:

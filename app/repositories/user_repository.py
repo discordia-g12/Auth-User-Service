@@ -22,7 +22,14 @@ class UserRepository:
         return result.scalar_one_or_none()
 
     async def create_user_profile_and_outbox(
-        self, session: AsyncSession, user_id: str, username: str, email: str, bio: str | None = None, avatar_url: str | None = None, outbox_payload: dict[str, Any] | None = None
+        self,
+        session: AsyncSession,
+        user_id: str,
+        username: str,
+        email: str,
+        bio: str | None = None,
+        avatar_url: str | None = None,
+        outbox_payload: dict[str, Any] | None = None,
     ) -> tuple[User, UserProfile]:
         """Atomically inserts User, UserProfile, and OutboxEvent within active transaction."""
         user = User(

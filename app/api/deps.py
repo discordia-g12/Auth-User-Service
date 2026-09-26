@@ -2,7 +2,7 @@ from dataclasses import dataclass
 
 from fastapi import Header
 
-from app.exceptions import BadRequestError, UnauthorizedError
+from app.exceptions import UnauthorizedError
 
 
 @dataclass(frozen=True)
