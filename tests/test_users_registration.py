@@ -106,6 +106,7 @@ async def test_register_profile_unverified_email_forbidden(
     assert response.headers["content-type"] == "application/problem+json"
     data = response.json()
     assert data["status"] == 403
+    assert data["type"] == "https://discordia.app/problems/email-not-verified"
     assert "must be verified" in data["detail"]
 
     # Nothing may be persisted: the email must stay free for its real owner.
@@ -160,6 +161,7 @@ async def test_register_profile_duplicate_user_id_conflict(client: AsyncClient, 
     assert duplicate_res.status_code == 409
     data = duplicate_res.json()
     assert data["status"] == 409
+    assert data["type"] == "about:blank"
     assert "User already has a registered profile" in data["detail"]
 
 

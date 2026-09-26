@@ -27,3 +27,14 @@ async def test_not_found_endpoint_rfc7807_format(client: AsyncClient):
     assert data["type"] == "about:blank"
     assert data["status"] == 404
     assert data["instance"] == "/api/v1/non-existent-endpoint"
+
+
+def test_problem_types_contract():
+    """Guards the `type` URIs that web/mobile clients branch on. Changing one is a breaking API change."""
+    from app.exceptions import AppException, EmailNotVerifiedError, ForbiddenError, UserAlreadyExistsError
+
+    assert AppException("x").type == "about:blank"
+    assert ForbiddenError().type == "about:blank"
+    assert UserAlreadyExistsError().type == "about:blank"
+    assert EmailNotVerifiedError().type == "https://discordia.app/problems/email-not-verified"
+    assert EmailNotVerifiedError().status_code == 403

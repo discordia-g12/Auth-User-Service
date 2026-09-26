@@ -1,9 +1,12 @@
 from typing import Any
 
+PROBLEM_TYPE_BASE = "https://discordia.app/problems"
+
 
 class AppException(Exception):
     status_code: int = 500
     title: str = "Internal Server Error"
+    type: str = "about:blank"
 
     def __init__(
         self,
@@ -75,6 +78,8 @@ class UsernameConflictError(ConflictError):
 
 
 class EmailNotVerifiedError(ForbiddenError):
+    type = f"{PROBLEM_TYPE_BASE}/email-not-verified"
+
     def __init__(
         self,
         detail: str = "Email address must be verified before registering in Discordia. Check your inbox.",
@@ -88,6 +93,7 @@ class UserProfileNotFoundError(NotFoundError):
 
 
 __all__ = [
+    "PROBLEM_TYPE_BASE",
     "AppException",
     "BadRequestError",
     "ConflictError",
