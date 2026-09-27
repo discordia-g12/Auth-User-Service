@@ -1,17 +1,10 @@
+# Dependencias de runtime (las que instala la imagen de producción).
 fastapi==0.115.0
 uvicorn[standard]==0.31.0
 SQLAlchemy==2.0.35
+greenlet==3.5.5  
 alembic==1.13.3
 asyncpg==0.31.0
 pydantic==2.9.2
 pydantic-settings==2.5.2
 structlog==26.1.0
-
-# Testing & Dev
-pytest==9.1.1
-pytest-asyncio==1.4.0
-pytest-cov==7.1.0
-httpx==0.28.1
-aiosqlite==0.22.1
-ruff==0.16.7
-greenlet==3.5.5
