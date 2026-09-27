@@ -14,6 +14,7 @@ class AppException(Exception):
         status_code: int | None = None,
         title: str | None = None,
         invalid_params: list[dict[str, Any]] | None = None,
+        headers: dict[str, str] | None = None,
     ):
         super().__init__(detail)
         self.detail = detail
@@ -22,6 +23,7 @@ class AppException(Exception):
         if title is not None:
             self.title = title
         self.invalid_params = invalid_params
+        self.headers = headers
 
 
 class BadRequestError(AppException):
@@ -98,6 +100,31 @@ class UserProfileNotFoundError(NotFoundError):
         super().__init__(detail)
 
 
+class PasswordResetThrottledError(AppException):
+    """Too many reset requests for one email. Applies to any email, so it does not reveal registration."""
+
+    status_code = 429
+    title = "Too Many Requests"
+    type = f"{PROBLEM_TYPE_BASE}/password-reset-throttled"
+
+    def __init__(self, retry_after_seconds: int):
+        self.retry_after_seconds = retry_after_seconds
+        super().__init__(
+            "Too many password reset requests for this email. Try again later.",
+            headers={"Retry-After": str(retry_after_seconds)},
+        )
+
+
+class IdentityProviderUnavailableError(AppException):
+    """The identity provider could not process the request. The cause is logged, never returned."""
+
+    status_code = 503
+    title = "Service Unavailable"
+
+    def __init__(self, detail: str = "The request could not be processed right now. Try again later."):
+        super().__init__(detail)
+
+
 class InvalidAvatarError(UnprocessableEntityError):
     def __init__(self, detail: str = "Invalid avatar file or format provided."):
         super().__init__(detail)
@@ -118,7 +145,9 @@ __all__ = [
     "ConflictError",
     "EmailNotVerifiedError",
     "ForbiddenError",
+    "IdentityProviderUnavailableError",
     "NotFoundError",
+    "PasswordResetThrottledError",
     "UnauthorizedError",
     "UnprocessableEntityError",
     "UserAlreadyExistsError",

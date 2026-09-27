@@ -1,13 +1,24 @@
 [tool.ruff]
-line-length = 220
-target-version = "py313"
+target-version = "py312"
+line-length = 120
+extend-exclude = ["alembic/versions"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP"]
+
+[tool.ruff.lint.isort]
+known-first-party = ["app"]
 
 [tool.pytest.ini_options]
-asyncio_mode = "auto"
 testpaths = ["tests"]
+pythonpath = ["."]
+asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "function"
 
 [tool.coverage.run]
-branch = true
 source = ["app"]
 concurrency = ["greenlet", "thread"]
-omit = ["app/core/logger.py"]
+
+[tool.coverage.report]
+fail_under = 85
+show_missing = true
