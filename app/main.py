@@ -8,8 +8,10 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.v1.users import router as users_router
 from app.core.exceptions import register_exception_handlers
-from app.core.logger import setup_logging
+from app.core.logger import get_logger, setup_logging
 from app.db.session import get_db
+
+logger = get_logger(__name__)
 
 
 @asynccontextmanager
@@ -43,10 +45,12 @@ async def liveness_probe():
 
 @app.get("/readyz", tags=["Health"])
 async def readiness_probe(response: Response, db: Annotated[AsyncSession, Depends(get_db)]):
-    """Readiness probe: validates critical dependencies such as the database are operational."""
+    """Readiness probe: validates critical dependencies such as the database are operational.
+    """
     try:
         await db.execute(text("SELECT 1"))
-        return {"status": "ready"}
-    except SQLAlchemyError as e:
+    except (SQLAlchemyError, OSError):
+        logger.exception("readiness_check_failed", dependency="database")
         response.status_code = status.HTTP_503_SERVICE_UNAVAILABLE
-        return {"status": "not_ready", "detail": str(e)}
+        return {"status": "not_ready"}
+    return {"status": "ready"}
