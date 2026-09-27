@@ -14,6 +14,11 @@ class CreateUserProfileRequest(BaseModel):
         description="Unique username on the Discordia platform",
         examples=["cyber_samurai"],
     )
+    display_name: str | None = Field(
+        default=None,
+        max_length=64,
+        description="Display name",
+    )
     bio: str | None = Field(
         default=None,
         max_length=190,
@@ -34,6 +39,7 @@ class UserProfileResponse(BaseModel):
 
     user_id: str = Field(..., description="Opaque external identity identifier")
     username: str = Field(..., description="Unique Discordia username")
+    display_name: str | None = Field(default=None, description="Display name")
     avatar_url: str | None = Field(default=None, description="Public avatar URL")
     bio: str | None = Field(default=None, description="User biography")
     activity_status: str = Field(default="offline", description="Real-time activity status")

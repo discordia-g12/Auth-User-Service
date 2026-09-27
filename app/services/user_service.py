@@ -56,6 +56,7 @@ class UserService:
         return UserProfileResponse(
             user_id=user.id,
             username=profile.username,
+            display_name=profile.display_name,
             avatar_url=profile.avatar_url,
             bio=profile.bio,
             activity_status=profile.activity_status,
@@ -74,6 +75,7 @@ class UserService:
         return UserProfileResponse(
             user_id=user.id,
             username=profile.username,
+            display_name=profile.display_name,
             avatar_url=profile.avatar_url,
             bio=profile.bio,
             activity_status=profile.activity_status,

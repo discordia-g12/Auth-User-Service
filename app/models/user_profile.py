@@ -16,6 +16,7 @@ class UserProfile(Base):
 
     user_id: Mapped[str] = mapped_column(String, ForeignKey("users.id", ondelete="CASCADE"), primary_key=True)
     username: Mapped[str] = mapped_column(String, unique=True, index=True, nullable=False)
+    display_name: Mapped[str | None] = mapped_column(String, nullable=True)
     avatar_url: Mapped[str | None] = mapped_column(String, nullable=True)
     bio: Mapped[str | None] = mapped_column(String, nullable=True)
     activity_status: Mapped[str] = mapped_column(String, default="offline")
