@@ -1,4 +1,5 @@
 import re
+
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 USERNAME_MIN = 3
@@ -10,11 +11,7 @@ USERNAME_PATTERN = re.compile(r"^[A-Za-z0-9_.]+$")
 class ProfileUpdate(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    username: str | None = Field(
-        default=None, 
-        min_length=USERNAME_MIN, 
-        max_length=USERNAME_MAX
-    )
+    username: str | None = Field(default=None, min_length=USERNAME_MIN, max_length=USERNAME_MAX)
     bio: str | None = Field(default=None, max_length=BIO_MAX)
 
     @field_validator("username")

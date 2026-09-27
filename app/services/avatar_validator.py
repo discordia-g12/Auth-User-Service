@@ -10,6 +10,7 @@ from app.exceptions import InvalidAvatarError
 MAX_AVATAR_SIZE = 5 * 1024 * 1024
 ALLOWED_FORMATS = {"JPEG", "PNG", "WEBP"}
 
+
 # Valida el archivo de avatar y los requerimientos de su formato (tamaño, extension, etc)
 async def validate_avatar(file: UploadFile | None) -> bytes:
 

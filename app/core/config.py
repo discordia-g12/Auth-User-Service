@@ -28,7 +28,6 @@ class Settings(BaseSettings):
     def rabbitmq_url(self) -> str:
         return f"amqp://{self.rabbitmq_user}:{self.rabbitmq_password}@{self.rabbitmq_host}:{self.rabbitmq_port}/"
 
-
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 
 

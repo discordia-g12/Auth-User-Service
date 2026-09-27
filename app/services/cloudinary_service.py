@@ -6,6 +6,7 @@ from app.exceptions import AvatarUploadError
 
 _configured = False
 
+
 def _ensure_configured() -> None:
     global _configured
     if _configured:
@@ -17,6 +18,7 @@ def _ensure_configured() -> None:
         secure=True,
     )
     _configured = True
+
 
 # Sube el archivo binario a Cloudinary y devuelve la url publica. Cada user pisa la imagen anterior
 def upload_avatar(contents, user_id) -> str:

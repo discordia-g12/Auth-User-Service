@@ -43,10 +43,9 @@ async def get_authenticated_identity(
     )
 
 
-async def get_current_user_id(
-    identity: Annotated[AuthenticatedIdentity, Depends(get_authenticated_identity)]
-) -> str:
+async def get_current_user_id(identity: Annotated[AuthenticatedIdentity, Depends(get_authenticated_identity)]) -> str:
     return identity.user_id
+
 
 DbSession = Annotated[AsyncSession, Depends(get_db)]
 CurrentIdentity = Annotated[AuthenticatedIdentity, Depends(get_authenticated_identity)]

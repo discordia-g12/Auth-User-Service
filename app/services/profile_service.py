@@ -25,7 +25,7 @@ class ProfileService:
 
         if new_username is not None and new_username != profile.username:
             existing = await self.repo.get_by_username(new_username)
-            
+
             if existing is not None:
                 raise UsernameTakenError(new_username)
 

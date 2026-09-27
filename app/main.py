@@ -7,10 +7,9 @@ from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.v1 import api_router
-from app.db.session import get_db
-
 from app.core.exceptions import register_exception_handlers
 from app.core.logger import setup_logging
+from app.db.session import get_db
 
 
 @asynccontextmanager
@@ -28,6 +27,7 @@ app = FastAPI(
 
 register_exception_handlers(app)
 app.include_router(api_router, prefix="/api/v1")
+
 
 @app.get("/", tags=["Root"])
 def read_root():

@@ -76,10 +76,12 @@ class UsernameConflictError(ConflictError):
     def __init__(self, username: str):
         super().__init__(f"Username '{username}' is already in use.")
 
+
 class UsernameTakenError(ConflictError):
     def __init__(self, username: str | None = None):
         detail = f"Username '{username}' is already taken." if username else "Username is already taken."
         super().__init__(detail)
+
 
 class EmailNotVerifiedError(ForbiddenError):
     type = f"{PROBLEM_TYPE_BASE}/email-not-verified"
@@ -107,7 +109,6 @@ class AvatarUploadError(AppException):
 
     def __init__(self, detail: str = "Failed to process or upload avatar image."):
         super().__init__(detail)
-
 
 
 __all__ = [

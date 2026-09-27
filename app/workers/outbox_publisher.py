@@ -20,10 +20,7 @@ BATCH_SIZE = 50
 
 async def _fetch_pending(db) -> list[OutboxEvent]:
     result = await db.execute(
-        select(OutboxEvent)
-        .where(OutboxEvent.processed_at.is_(None))
-        .order_by(OutboxEvent.created_at)
-        .limit(BATCH_SIZE)
+        select(OutboxEvent).where(OutboxEvent.processed_at.is_(None)).order_by(OutboxEvent.created_at).limit(BATCH_SIZE)
     )
     return list(result.scalars())
 

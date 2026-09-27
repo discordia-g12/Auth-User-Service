@@ -17,6 +17,7 @@ URL_AVATAR = "/api/v1/users/me/profile/avatar"
 # Helpers compartidos. Usan db_session (SQLite en memoria, fixture de conftest.py)
 # en vez de conectarse a Postgres real: mas rapido, aislado, y no depende de Docker.
 
+
 def _unique(prefix: str = "user") -> str:
     return f"{prefix}_{uuid.uuid4().hex[:8]}"
 
@@ -58,6 +59,7 @@ def mock_cloudinary(monkeypatch):
 
 
 # CA 1: Edicion exitosa (username / bio)
+
 
 async def test_update_username_and_bio(client, db_session, user_id):
     new_name = _unique("nuevo")
@@ -116,6 +118,7 @@ async def test_explicit_null_bio_clears_bio(client, db_session):
 
 # CA 2: Foto de perfil actualizada (avatar via Cloudinary)
 
+
 async def test_upload_avatar_success_updates_profile(client, db_session, user_id):
     files = {"file": ("avatar.png", _fake_image_bytes("PNG"), "image/png")}
     response = await client.patch(URL_AVATAR, files=files, headers=_headers(user_id))
@@ -153,6 +156,7 @@ async def test_upload_avatar_emits_outbox_event(client, db_session, user_id):
 
 
 # CA 3: Datos invalidos (aplica tanto a username/bio como a la imagen)
+
 
 @pytest.mark.parametrize(
     "payload",
@@ -215,6 +219,7 @@ async def test_upload_avatar_rejects_empty_file(client, user_id):
 
 # Conflictos de negocio (username duplicado) — parte de CA 3
 
+
 async def test_username_already_taken_returns_409(client, db_session, user_id):
     other_name = _unique("taken")
     await _create_user(db_session, other_name)
@@ -239,6 +244,7 @@ async def test_username_race_condition_returns_409(client, db_session, user_id, 
 
 
 # Autenticacion / recursos inexistentes — transversal a CA 1 y CA 2
+
 
 async def test_missing_user_header_returns_401(client):
     response = await client.patch(URL_PROFILE, json={"bio": "hola"})
