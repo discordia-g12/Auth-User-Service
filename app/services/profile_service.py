@@ -2,7 +2,7 @@ import asyncio
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.exceptions import AvatarUploadError, ProfileNotFoundError, UsernameTakenError
+from app.exceptions import AvatarUploadError, UsernameTakenError, UserProfileNotFoundError
 from app.models.user_profile import UserProfile
 from app.repositories.profile_repository import ProfileRepository
 from app.services.cloudinary_service import upload_avatar as cloudinary_upload_avatar
@@ -17,7 +17,7 @@ class ProfileService:
         profile = await self.repo.get_by_user_id(user_id)
 
         if profile is None:
-            raise ProfileNotFoundError(user_id)
+            raise UserProfileNotFoundError()
 
         changes = data.model_dump(exclude_unset=True)
 
@@ -43,7 +43,7 @@ class ProfileService:
         profile = await self.repo.get_by_user_id(user_id)
 
         if profile is None:
-            raise ProfileNotFoundError(user_id)
+            raise UserProfileNotFoundError()
 
         # Es bloqueante, lo hacemos async (espera a que el thread termine, pero sin bloquear el event loop)
         avatar_url = await asyncio.to_thread(cloudinary_upload_avatar, contents, user_id)

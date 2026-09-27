@@ -2,7 +2,7 @@ import cloudinary
 import cloudinary.uploader
 
 from app.core.config import settings
-from app.core.exceptions import AvatarUploadError
+from app.exceptions import AvatarUploadError
 
 _configured = False
 

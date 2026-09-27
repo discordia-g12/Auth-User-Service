@@ -5,7 +5,7 @@ from fastapi import UploadFile
 # PIL es la libreria de python para trabajar con imagenes
 from PIL import Image, UnidentifiedImageError
 
-from app.core.exceptions import InvalidAvatarError
+from app.exceptions import InvalidAvatarError
 
 MAX_AVATAR_SIZE = 5 * 1024 * 1024
 ALLOWED_FORMATS = {"JPEG", "PNG", "WEBP"}

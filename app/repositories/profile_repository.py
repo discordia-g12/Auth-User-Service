@@ -2,7 +2,7 @@ from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.exceptions import UsernameTakenError
+from app.exceptions import UsernameTakenError
 from app.models.outbox import OutboxEvent
 from app.models.user_profile import UserProfile
 
