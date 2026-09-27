@@ -10,7 +10,7 @@ from app.schemas.problem import ProblemDetails
 from app.schemas.user import CreateUserProfileRequest, UserProfileResponse
 from app.services.user_service import UserService
 
-router = APIRouter()
+router = APIRouter(prefix="/users", tags=["Users"])
 user_service = UserService()
 
 

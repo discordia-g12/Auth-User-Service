@@ -5,3 +5,9 @@ target-version = "py313"
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
 testpaths = ["tests"]
+
+[tool.coverage.run]
+branch = true
+source = ["app"]
+concurrency = ["greenlet", "thread"]
+omit = ["app/core/logger.py"]

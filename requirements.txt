@@ -6,6 +6,11 @@ asyncpg==0.31.0
 pydantic==2.9.2
 pydantic-settings==2.5.2
 structlog==26.1.0
+cloudinary==1.41.0
+aio-pika==9.4.3
+Pillow==10.4.0
+python-multipart==0.0.12
+bandit>=1.7
 
 # Testing & Dev
 pytest==9.1.1

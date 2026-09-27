@@ -1,7 +1,10 @@
 from dataclasses import dataclass
+from typing import Annotated
 
-from fastapi import Header
+from fastapi import Depends, Header
+from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.db.session import get_db
 from app.exceptions import UnauthorizedError
 
 
@@ -38,3 +41,12 @@ async def get_authenticated_identity(
         email=x_user_email,
         email_verified=_parse_bool_header(x_user_email_verified),
     )
+
+
+async def get_current_user_id(identity: Annotated[AuthenticatedIdentity, Depends(get_authenticated_identity)]) -> str:
+    return identity.user_id
+
+
+DbSession = Annotated[AsyncSession, Depends(get_db)]
+CurrentIdentity = Annotated[AuthenticatedIdentity, Depends(get_authenticated_identity)]
+CurrentUserId = Annotated[str, Depends(get_current_user_id)]
