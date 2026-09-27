@@ -3,3 +3,9 @@ class ProfileNotFoundError(Exception):
 
 class UsernameTakenError(Exception):
     pass
+
+class InvalidAvatarError(Exception):
+    pass
+
+class AvatarUploadError(Exception):
+    pass

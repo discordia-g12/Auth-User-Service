@@ -1,9 +1,11 @@
-from sqlalchemy.exc import IntegrityError
+import asyncio
+
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.exceptions import AvatarUploadError, ProfileNotFoundError, UsernameTakenError
 from app.models.user_profile import UserProfile
 from app.repositories.profile_repository import ProfileRepository
-from app.core.exceptions import ProfileNotFoundError, UsernameTakenError
+from app.services.cloudinary_service import upload_avatar as cloudinary_upload_avatar
 
 
 class ProfileService:
@@ -33,6 +35,33 @@ class ProfileService:
         except UsernameTakenError:
             await self.db.rollback()
             raise
+
+        await self.db.refresh(profile)
+        return profile
+
+    async def upload_avatar(self, user_id, contents) -> UserProfile:
+        profile = await self.repo.get_by_user_id(user_id)
+
+        if profile is None:
+            raise ProfileNotFoundError(user_id)
+
+        # Es bloqueante, lo hacemos async (espera a que el thread termine, pero sin bloquear el event loop)
+        avatar_url = await asyncio.to_thread(cloudinary_upload_avatar, contents, user_id)
+
+        try:
+            await self.repo.update_avatar(profile, avatar_url)
+            await self.repo.add_outbox_event(
+                event_type="user.profile.updated",
+                aggregate_id=user_id,
+                payload={
+                    "user_id": user_id,
+                    "avatar_url": avatar_url,
+                },
+            )
+            await self.db.commit()
+        except Exception:
+            await self.db.rollback()
+            raise AvatarUploadError("Could not upload new avatar") from None
 
         await self.db.refresh(profile)
         return profile
