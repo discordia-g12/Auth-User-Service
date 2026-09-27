@@ -19,6 +19,14 @@ class Settings(BaseSettings):
     database_user: str = "postgres"
     database_password: str = "postgres"
 
+    auth0_domain: str = ""
+    auth0_client_id: str = ""
+    auth0_db_connection: str = "Username-Password-Authentication"
+    auth0_timeout_seconds: float = 5.0
+
+    password_reset_max_requests: int = 3
+    password_reset_window_seconds: int = 900
+
     @property
     def database_url(self) -> str:
         """Async DSN. URL.create escapes special characters in the credentials (e.g. '@' or '/')."""

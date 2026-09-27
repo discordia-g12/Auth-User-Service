@@ -14,12 +14,15 @@ de tokens son de Auth0. El servicio confía en la identidad que le inyecta el AP
 |--------|------|-------------|------------|
 | `POST` | `/api/v1/users/me` | Provisiona el usuario y su perfil para la identidad autenticada | `201`, `400`, `401`, `403`, `409`, `422` |
 | `GET` | `/api/v1/users/me` | Devuelve el perfil propio. El `404` es el discriminador de onboarding del cliente | `200`, `401`, `404` |
+| `POST` | `/api/v1/auth/password-reset` | **Público.** Pide a Auth0 el email de recupero de contraseña. Misma respuesta exista o no la cuenta; límite de 3 pedidos por email cada 15 min (ver [ADR-006](docs/ADR-006-Recupero-de-Contrasena.md)) | `202`, `422`, `429`, `503` |
 | `GET` | `/livez` | Liveness, sin I/O | `200` |
 | `GET` | `/readyz` | Readiness: verifica la base de datos. Ante una falla no expone el detalle del error, que solo queda en el log | `200`, `503` |
 
 Los errores siguen RFC 7807 (`application/problem+json`). Los clientes solo deben ramificar
-por el campo `type`: hoy el único `type` propio es
-`https://discordia.app/problems/email-not-verified` (403).
+por el campo `type`. Los `type` propios son:
+
+- `https://discordia.app/problems/email-not-verified` (403)
+- `https://discordia.app/problems/password-reset-throttled` (429, con header `Retry-After`)
 
 Swagger UI: `http://localhost:8004/docs`.
 
@@ -73,6 +76,17 @@ alembic upgrade head
 
 Los tests no necesitan base de datos: usan SQLite en memoria.
 
+### Variables de entorno
+
+| Variable | Default | Descripción |
+|----------|---------|-------------|
+| `DATABASE_HOST` / `DATABASE_PORT` / `DATABASE_NAME` / `DATABASE_USER` / `DATABASE_PASSWORD` | `auth-db` / `5432` / `auth_db` / `postgres` / `postgres` | Conexión a PostgreSQL |
+| `AUTH0_DOMAIN` | — | Dominio del tenant. Requerida para el recupero de contraseña (sin ella el endpoint responde `503`) |
+| `AUTH0_CLIENT_ID` | — | `client_id` público de la app Discordia en Auth0 (el mismo que usan web y mobile) |
+| `AUTH0_DB_CONNECTION` | `Username-Password-Authentication` | Conexión de base de datos de Auth0 |
+| `PASSWORD_RESET_MAX_REQUESTS` | `3` | Pedidos de recupero permitidos por email dentro de la ventana |
+| `PASSWORD_RESET_WINDOW_SECONDS` | `900` | Ventana del límite por email, en segundos |
+
 ## Tests, lint y seguridad
 
 ```bash
@@ -97,3 +111,4 @@ más `alembic upgrade head` contra Postgres 16 y el build de la imagen, en cada 
 | [ADR-003](docs/ADR-003-Avatares.md) | Almacenamiento y gestión de avatares | Aceptado, implementación parcial |
 | [ADR-004](docs/ADR-004-CI-CD.md) | Pipeline de CI y alcance de CD | Aceptado |
 | [ADR-005](docs/ADR-005-Transactional-Outbox.md) | Transactional Outbox para eventos de dominio | Aceptado, implementación parcial |
+| [ADR-006](docs/ADR-006-Recupero-de-Contrasena.md) | Recupero de contraseña: endpoint propio con límite por email | Aceptado |

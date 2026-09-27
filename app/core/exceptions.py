@@ -24,6 +24,7 @@ def problem_response(
     detail: str,
     invalid_params: list[dict[str, Any]] | None = None,
     problem_type: str = "about:blank",
+    headers: dict[str, str] | None = None,
 ) -> JSONResponse:
     content: dict[str, Any] = {
         "type": problem_type,
@@ -34,11 +35,15 @@ def problem_response(
     }
     if invalid_params:
         content["invalid_params"] = invalid_params
-    return JSONResponse(status_code=status_code, content=content, media_type="application/problem+json")
+    return JSONResponse(
+        status_code=status_code, content=content, media_type="application/problem+json", headers=headers
+    )
 
 
 async def app_exception_handler(request: Request, exc: AppException) -> JSONResponse:
-    return problem_response(request, exc.status_code, exc.title, exc.detail, exc.invalid_params, exc.type)
+    return problem_response(
+        request, exc.status_code, exc.title, exc.detail, exc.invalid_params, exc.type, headers=exc.headers
+    )
 
 
 async def validation_exception_handler(request: Request, exc: RequestValidationError) -> JSONResponse:

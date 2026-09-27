@@ -8,7 +8,7 @@ from sqlalchemy.pool import StaticPool
 from app.db.base import Base
 from app.db.session import get_db
 from app.main import app as fastapi_app
-from app.models import OutboxEvent, User, UserProfile  # noqa: F401
+from app.models import OutboxEvent, PasswordResetRequest, User, UserProfile  # noqa: F401
 
 TEST_DATABASE_URL = "sqlite+aiosqlite:///:memory:"
 

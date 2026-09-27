@@ -4,7 +4,7 @@
 - **Fecha:** 2026-09-10 · **Revisado:** 2026-09-27
 - **Alcance:** `auth-user-service`, API Gateway (Kong), Auth0
 - **Reemplaza a:** `ADR-03-Auth0-vs-Custom-Auth.md`
-- **Relacionado:** ADR-001 del repositorio Gateway (validación de JWT en Kong)
+- **Relacionado:** ADR-001 del repositorio Gateway (validación de JWT en Kong); ADR-006 (recupero de contraseña)
 
 ---
 
@@ -29,7 +29,7 @@ Las responsabilidades quedan repartidas así.
 ### 2.1 Auth0 (Identity Provider)
 
 - Es el único componente que recibe, valida y almacena contraseñas. **Discordia no persiste contraseñas ni hashes.**
-- Aplica la password policy, el registro (Universal Login con `screen_hint: "signup"`), el login, la recuperación de cuenta y MFA. Usa Authorization Code con PKCE.
+- Aplica la password policy, el registro (Universal Login con `screen_hint: "signup"`), el login, la recuperación de cuenta (disparada desde el servicio, ver ADR-006) y MFA. Usa Authorization Code con PKCE.
 - Emite access tokens **RS256** para el audience de la API, verificables contra su JWKS pública, que rota claves.
 - Una **Post Login Action** (`Gateway/auth0/post-login-action.js`):
   - **deniega el login si `email_verified !== true`**, así un usuario sin verificar nunca obtiene un token;

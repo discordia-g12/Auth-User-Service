@@ -6,6 +6,7 @@ from sqlalchemy import text
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.api.v1.password_reset import router as password_reset_router
 from app.api.v1.users import router as users_router
 from app.core.exceptions import register_exception_handlers
 from app.core.logger import get_logger, setup_logging
@@ -29,6 +30,7 @@ app = FastAPI(
 
 register_exception_handlers(app)
 app.include_router(users_router, prefix="/api/v1/users", tags=["Users"])
+app.include_router(password_reset_router, prefix="/api/v1/auth", tags=["Password reset"])
 
 
 @app.get("/", tags=["Root"])
