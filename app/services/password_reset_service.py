@@ -65,7 +65,7 @@ class PasswordResetService:
         count, oldest = await self._repository.recent_requests(session, email_hash, window_start)
 
         if count >= self._max_requests:
-            await session.commit()  
+            await session.commit()
             retry_after = self._retry_after_seconds(now, oldest)
             logger.warning("password_reset_throttled", email_hash=email_hash[:12], retry_after=retry_after)
             raise PasswordResetThrottledError(retry_after)

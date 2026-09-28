@@ -1,21 +1,21 @@
 # Dependencias de runtime (las que instala la imagen de producción).
+# Herramientas de test/lint/seguridad: requirements-dev.txt
 fastapi==0.115.0
 uvicorn[standard]==0.31.0
 SQLAlchemy==2.0.35
-greenlet==3.5.5  
+greenlet==3.5.5  # requerido por SQLAlchemy asyncio en runtime
 alembic==1.13.3
 asyncpg==0.31.0
 pydantic==2.9.2
 pydantic-settings==2.5.2
-email-validator==2.2.0  # EmailStr (password reset)
-httpx==0.28.1  # Auth0 Authentication API client
+email-validator==2.2.0  # EmailStr (recupero de contraseña)
+httpx==0.28.1  # cliente de la Authentication API de Auth0
 structlog==26.1.0
 
-# Testing & Dev
-pytest==9.1.1
-pytest-asyncio==1.4.0
-pytest-cov==7.1.0
-httpx==0.28.1
-aiosqlite==0.22.1
-ruff==0.16.7
-greenlet==3.5.5
+# Avatares (ADR-003)
+cloudinary==1.41.0
+Pillow==10.4.0  # validación de imágenes
+python-multipart==0.0.12  # UploadFile en FastAPI
+
+# Broker: relay del outbox (ADR-005)
+aio-pika==9.4.3

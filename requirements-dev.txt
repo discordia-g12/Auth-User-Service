@@ -9,5 +9,3 @@ aiosqlite==0.22.1
 # Lint y SAST
 ruff==0.16.7
 bandit>=1.7
-cloudinary==1.41.0
-aio-pika==9.4.3

@@ -12,7 +12,6 @@ from app.workers.outbox_publisher import _fetch_pending, _publish_pending_events
 
 
 class FakeExchange:
-
     def __init__(self, fail_for: set[str] | None = None):
         self.published = []
         self.fail_for = fail_for or set()
@@ -112,6 +111,7 @@ def _session_factory_for(db_session: AsyncSession):
 
 
 # No probamos contra un RabbitMQ real. Lo que si podemos
+
 
 class _StopLoop(Exception):
     """Excepcion centinela solo para cortar el `while True` de run() en el test."""

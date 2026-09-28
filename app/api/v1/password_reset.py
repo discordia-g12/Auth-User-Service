@@ -10,7 +10,7 @@ from app.schemas.password_reset import PasswordResetAcceptedResponse, PasswordRe
 from app.schemas.problem import ProblemDetails
 from app.services.password_reset_service import PasswordResetService
 
-router = APIRouter()
+router = APIRouter(prefix="/auth", tags=["Password reset"])
 
 
 def get_password_reset_service() -> PasswordResetService:
