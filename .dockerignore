@@ -1,24 +1,17 @@
-# Git
+.env
+.env.*
+!.env.example
+
 .git
-.gitignore
-
-# Virtual environments
-venv/
-env/
-.venv/
-
-# Python
+.github
 __pycache__/
-*.pyc
-*.pyo
-*.pyd
-.Python
-
-# Tests & logs
+*.py[cod]
 .pytest_cache/
+.ruff_cache/
 .coverage
-*.log
-
-# Docker
-Dockerfile
-docker-compose.yml
+coverage.xml
+htmlcov/
+.venv/
+venv/
+__MACOSX/
+.DS_Store
