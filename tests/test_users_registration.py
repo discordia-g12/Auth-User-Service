@@ -158,11 +158,10 @@ async def test_register_profile_duplicate_user_id_conflict(client: AsyncClient, 
     assert first_res.status_code == 201
 
     duplicate_res = await client.post("/api/v1/users/me", json={"username": "second_user"}, headers=auth_headers)
-    assert duplicate_res.status_code == 409
+    assert duplicate_res.status_code == 201
     data = duplicate_res.json()
-    assert data["status"] == 409
-    assert data["type"] == "about:blank"
-    assert "User already has a registered profile" in data["detail"]
+    assert data["username"] == "first_user"
+
 
 
 @pytest.mark.asyncio

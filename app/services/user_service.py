@@ -23,8 +23,20 @@ class UserService:
         no_null_bytes(request.avatar_url, "avatar_url")
 
         existing_user = await self.user_repo.get_user_by_id(session, user_id)
-        if existing_user is not None:
-            logger.warning("user_already_registered", user_id=user_id)
+        if existing_user is not None and existing_user.profile is not None:
+            logger.info("user_already_registered_idempotent", user_id=user_id)
+            profile = existing_user.profile
+            return UserProfileResponse(
+                user_id=existing_user.id,
+                username=profile.username,
+                display_name=profile.display_name,
+                avatar_url=profile.avatar_url,
+                bio=profile.bio,
+                activity_status=profile.activity_status,
+                custom_status=profile.custom_status,
+                created_at=existing_user.created_at,
+            )
+        elif existing_user is not None:
             raise UserAlreadyExistsError()
 
         existing_profile = await self.user_repo.get_profile_by_username(session, request.username)
