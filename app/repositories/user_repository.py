@@ -63,3 +63,10 @@ class UserRepository:
         session.add(outbox_event)
 
         return user, profile
+
+
+    async def get_users_by_ids(self, session: AsyncSession, user_ids: list[str]) -> list[User]:
+        """Retrieves multiple users by their IDs."""
+        stmt = select(User).where(User.id.in_(user_ids))
+        result = await session.execute(stmt)
+        return list(result.scalars().all())

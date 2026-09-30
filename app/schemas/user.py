@@ -45,3 +45,7 @@ class UserProfileResponse(BaseModel):
     activity_status: str = Field(default="offline", description="Real-time activity status")
     custom_status: str | None = Field(default=None, description="Custom status message")
     created_at: datetime = Field(..., description="Creation timestamp in ISO 8601 format")
+
+
+class BulkUserRequest(BaseModel):
+    user_ids: list[str] = Field(..., max_length=100, description="List of user IDs to fetch")

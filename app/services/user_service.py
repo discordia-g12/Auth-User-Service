@@ -82,3 +82,23 @@ class UserService:
             custom_status=profile.custom_status,
             created_at=user.created_at,
         )
+
+
+    async def get_users_bulk(self, session: AsyncSession, user_ids: list[str]) -> list[UserProfileResponse]:
+        """Retrieves profiles for a list of user IDs."""
+        users = await self.user_repo.get_users_by_ids(session, user_ids)
+        responses = []
+        for user in users:
+            if user.profile is not None:
+                profile = user.profile
+                responses.append(UserProfileResponse(
+                    user_id=user.id,
+                    username=profile.username,
+                    display_name=profile.display_name,
+                    avatar_url=profile.avatar_url,
+                    bio=profile.bio,
+                    activity_status=profile.activity_status,
+                    custom_status=profile.custom_status,
+                    created_at=user.created_at,
+                ))
+        return responses
