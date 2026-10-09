@@ -57,6 +57,22 @@ async def test_register_profile_success(client: AsyncClient, db_session: AsyncSe
 
 
 @pytest.mark.asyncio
+async def test_register_profile_persists_display_name(
+    client: AsyncClient, db_session: AsyncSession, auth_headers: dict[str, str]
+):
+    payload = {"username": "night_owl", "display_name": "Night Owl"}
+
+    response = await client.post("/api/v1/users/me", json=payload, headers=auth_headers)
+
+    assert response.status_code == 201
+    assert response.json()["display_name"] == "Night Owl"
+
+    profile_res = await db_session.execute(select(UserProfile).where(UserProfile.user_id == auth_headers["X-User-Id"]))
+    profile = profile_res.scalar_one()
+    assert profile.display_name == "Night Owl"
+
+
+@pytest.mark.asyncio
 async def test_register_profile_missing_user_id(client: AsyncClient):
     payload = {"username": "valid_user"}
     headers = {"X-User-Email": "user@discordia.com"}

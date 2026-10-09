@@ -19,6 +19,7 @@ class UserService:
     ) -> UserProfileResponse:
         """Initializes business user record and profile for the authenticated identity."""
         no_null_bytes(request.username, "username")
+        no_null_bytes(request.display_name, "display_name")
         no_null_bytes(request.bio, "bio")
         no_null_bytes(request.avatar_url, "avatar_url")
 
@@ -50,6 +51,7 @@ class UserService:
                 user_id=user_id,
                 username=request.username,
                 email=email,
+                display_name=request.display_name,
                 bio=request.bio,
                 avatar_url=request.avatar_url,
                 outbox_payload={"user_id": user_id, "username": request.username, "email": email},
