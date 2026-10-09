@@ -27,6 +27,7 @@ class UserRepository:
         user_id: str,
         username: str,
         email: str,
+        display_name: str | None = None,
         bio: str | None = None,
         avatar_url: str | None = None,
         outbox_payload: dict[str, Any] | None = None,
@@ -43,6 +44,7 @@ class UserRepository:
         profile = UserProfile(
             user_id=user_id,
             username=username,
+            display_name=display_name,
             bio=bio,
             avatar_url=avatar_url,
             activity_status="offline",
@@ -63,3 +65,10 @@ class UserRepository:
         session.add(outbox_event)
 
         return user, profile
+
+
+    async def get_users_by_ids(self, session: AsyncSession, user_ids: list[str]) -> list[User]:
+        """Retrieves multiple users by their IDs."""
+        stmt = select(User).where(User.id.in_(user_ids))
+        result = await session.execute(stmt)
+        return list(result.scalars().all())

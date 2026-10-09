@@ -7,7 +7,7 @@ from app.api.deps import AuthenticatedIdentity, get_authenticated_identity
 from app.db.session import get_db
 from app.exceptions import BadRequestError, EmailNotVerifiedError
 from app.schemas.problem import ProblemDetails
-from app.schemas.user import CreateUserProfileRequest, UserProfileResponse
+from app.schemas.user import BulkUserRequest, CreateUserProfileRequest, UserProfileResponse
 from app.services.user_service import UserService
 
 router = APIRouter(prefix="/users", tags=["Users"])
@@ -97,4 +97,23 @@ async def get_my_profile(
     return await user_service.get_my_profile(
         session=db,
         user_id=identity.user_id,
+    )
+
+
+@router.post(
+    "/bulk",
+    status_code=status.HTTP_200_OK,
+    response_model=list[UserProfileResponse],
+    summary="Fetch multiple user profiles",
+    description="Returns public profile data for a given list of user IDs. Only retrieves initialized profiles.",
+)
+async def get_users_bulk(
+    payload: BulkUserRequest,
+    identity: Annotated[AuthenticatedIdentity, Depends(get_authenticated_identity)],
+    db: Annotated[AsyncSession, Depends(get_db)],
+) -> list[UserProfileResponse]:
+    """Retrieves profiles for multiple users."""
+    return await user_service.get_users_bulk(
+        session=db,
+        user_ids=payload.user_ids,
     )

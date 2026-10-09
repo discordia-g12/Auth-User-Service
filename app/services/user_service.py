@@ -19,12 +19,25 @@ class UserService:
     ) -> UserProfileResponse:
         """Initializes business user record and profile for the authenticated identity."""
         no_null_bytes(request.username, "username")
+        no_null_bytes(request.display_name, "display_name")
         no_null_bytes(request.bio, "bio")
         no_null_bytes(request.avatar_url, "avatar_url")
 
         existing_user = await self.user_repo.get_user_by_id(session, user_id)
-        if existing_user is not None:
-            logger.warning("user_already_registered", user_id=user_id)
+        if existing_user is not None and existing_user.profile is not None:
+            logger.info("user_already_registered_idempotent", user_id=user_id)
+            profile = existing_user.profile
+            return UserProfileResponse(
+                user_id=existing_user.id,
+                username=profile.username,
+                display_name=profile.display_name,
+                avatar_url=profile.avatar_url,
+                bio=profile.bio,
+                activity_status=profile.activity_status,
+                custom_status=profile.custom_status,
+                created_at=existing_user.created_at,
+            )
+        elif existing_user is not None:
             raise UserAlreadyExistsError()
 
         existing_profile = await self.user_repo.get_profile_by_username(session, request.username)
@@ -38,6 +51,7 @@ class UserService:
                 user_id=user_id,
                 username=request.username,
                 email=email,
+                display_name=request.display_name,
                 bio=request.bio,
                 avatar_url=request.avatar_url,
                 outbox_payload={"user_id": user_id, "username": request.username, "email": email},
@@ -82,3 +96,23 @@ class UserService:
             custom_status=profile.custom_status,
             created_at=user.created_at,
         )
+
+
+    async def get_users_bulk(self, session: AsyncSession, user_ids: list[str]) -> list[UserProfileResponse]:
+        """Retrieves profiles for a list of user IDs."""
+        users = await self.user_repo.get_users_by_ids(session, user_ids)
+        responses = []
+        for user in users:
+            if user.profile is not None:
+                profile = user.profile
+                responses.append(UserProfileResponse(
+                    user_id=user.id,
+                    username=profile.username,
+                    display_name=profile.display_name,
+                    avatar_url=profile.avatar_url,
+                    bio=profile.bio,
+                    activity_status=profile.activity_status,
+                    custom_status=profile.custom_status,
+                    created_at=user.created_at,
+                ))
+        return responses

@@ -1,7 +1,7 @@
 import pytest
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.exceptions import UserAlreadyExistsError, UsernameConflictError, UserProfileNotFoundError
+from app.exceptions import UsernameConflictError, UserProfileNotFoundError
 from app.schemas.user import CreateUserProfileRequest
 from app.services.user_service import UserService
 
@@ -40,13 +40,15 @@ async def test_user_service_user_already_exists_error(db_session: AsyncSession):
         request=req1,
     )
 
-    with pytest.raises(UserAlreadyExistsError):
-        await service.register_user_profile(
-            session=db_session,
-            user_id="auth0|duplicate-id",
-            email="dup2@discordia.com",
-            request=req2,
-        )
+    # Should now be idempotent and return the original profile instead of raising an error
+    profile = await service.register_user_profile(
+        session=db_session,
+        user_id="auth0|duplicate-id",
+        email="dup2@discordia.com",
+        request=req2,
+    )
+    assert profile.username == "alpha_user"
+
 
 
 @pytest.mark.asyncio
