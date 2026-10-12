@@ -155,6 +155,32 @@ async def test_upload_avatar_emits_outbox_event(client, db_session, user_id):
     assert events[0].processed_at is None
 
 
+async def test_update_profile_emits_outbox_event(client, db_session, user_id):
+    """Editar nombre/bio/estado avisa igual que el avatar, para que los demás lo vean actualizado."""
+    payload = {"display_name": "Nuevo Nombre", "custom_status": "jugando"}
+    await client.patch(URL_PROFILE, json=payload, headers=_headers(user_id))
+
+    result = await db_session.execute(select(OutboxEvent).where(OutboxEvent.aggregate_id == user_id))
+    events = result.scalars().all()
+
+    assert len(events) == 1
+    assert events[0].event_type == "user.profile.updated"
+    assert events[0].payload == {"user_id": user_id, **payload}
+    assert events[0].processed_at is None
+
+
+async def test_rejected_update_does_not_emit_outbox_event(client, db_session, user_id):
+    """Si el cambio no se guarda (username ocupado), tampoco queda el evento."""
+    taken = _unique("ocupado")
+    await _create_user(db_session, taken)
+
+    response = await client.patch(URL_PROFILE, json={"username": taken}, headers=_headers(user_id))
+
+    assert response.status_code == 409
+    result = await db_session.execute(select(OutboxEvent).where(OutboxEvent.aggregate_id == user_id))
+    assert result.scalars().all() == []
+
+
 # CA 3: Datos invalidos (aplica tanto a username/bio como a la imagen)
 
 

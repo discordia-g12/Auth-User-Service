@@ -31,6 +31,11 @@ class ProfileService:
 
         try:
             await self.repo.update(profile, changes)
+            await self.repo.add_outbox_event(
+                event_type="user.profile.updated",
+                aggregate_id=user_id,
+                payload={"user_id": user_id, **changes},
+            )
             await self.db.commit()
         except UsernameTakenError:
             await self.db.rollback()
