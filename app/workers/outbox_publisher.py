@@ -49,7 +49,7 @@ def _build_message(event: OutboxEvent) -> aio_pika.Message:
 
 async def _publish_pending_events(exchange: AbstractExchange) -> int:
     published = 0
-    async with AsyncSessionLocal(expire_on_commit=False) as db:
+    async with AsyncSessionLocal() as db:  # la fábrica ya usa expire_on_commit=False (app/db/session.py)
         for event in await _fetch_pending(db):
             await exchange.publish(_build_message(event), routing_key=event.event_type)
 

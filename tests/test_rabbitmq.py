@@ -80,16 +80,25 @@ async def test_publish_pending_events_marks_processed_on_success(db_session: Asy
 
 @pytest.mark.asyncio
 async def test_publish_pending_events_keeps_event_pending_on_publish_failure(db_session: AsyncSession, monkeypatch):
-    event = await _add_event(db_session, "user.profile.updated")
+    # Si falla la publicacion se corta el ciclo (run() lo loguea y reintenta): asi no se publican
+    # los eventos siguientes antes que el que fallo y se respeta el orden.
+    published_before = await _add_event(db_session, "user.registered")
+    failing = await _add_event(db_session, "user.profile.updated")
+    # created_at de SQLite tiene precision de segundos: se fija para que el orden no dependa del id (uuid)
+    published_before.created_at = datetime(2000, 1, 1, tzinfo=UTC)
+    await db_session.commit()
     exchange = FakeExchange(fail_for={"user.profile.updated"})
 
     monkeypatch.setattr("app.workers.outbox_publisher.AsyncSessionLocal", _session_factory_for(db_session))
 
-    await _publish_pending_events(exchange)
+    with pytest.raises(ConnectionError):
+        await _publish_pending_events(exchange)
 
-    assert exchange.published == []
-    await db_session.refresh(event)
-    assert event.processed_at is None
+    assert [routing_key for routing_key, _ in exchange.published] == ["user.registered"]
+    await db_session.refresh(published_before)
+    await db_session.refresh(failing)
+    assert published_before.processed_at is not None
+    assert failing.processed_at is None
 
 
 def _session_factory_for(db_session: AsyncSession):
