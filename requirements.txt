@@ -13,8 +13,8 @@ httpx==0.28.1  # cliente de la Authentication API de Auth0
 structlog==26.1.0
 
 # Avatares (ADR-003)
-cloudinary==1.41.0
-Pillow==10.4.0  # validación de imágenes
+boto3==1.35.36  # S3
+Pillow==10.4.0  # validación y normalización de imágenes
 python-multipart==0.0.12  # UploadFile en FastAPI
 
 # Broker: relay del outbox (ADR-005)
