@@ -18,8 +18,11 @@ desnormalizada de la URL que debe mantenerse actualizada.
 
 1. **Amazon S3, un bucket para todas las imágenes** (`discordia-g12-media`, `infra/terraform/storage.tf`),
    con un prefijo por tipo: `avatars/` (Auth) y `server-icons/` (Server-Roles). Lectura pública solo en esos
-   prefijos; escritura y borrado solo para el rol IAM del nodo edge, donde corren los dos servicios. No hay
-   access keys en producción: boto3 toma las credenciales del rol de la instancia.
+   prefijos. **Cada servicio escribe con su propio usuario IAM** (`discordia-auth-media`,
+   `discordia-server-roles-media`), con permiso solo sobre su prefijo y claves pasadas por variables de
+   entorno. No se usa el rol ni la metadata de la EC2: un servicio puede moverse a otro nodo (o fuera de AWS)
+   llevándose sus claves, y uno comprometido no puede tocar las imágenes del otro. Sin claves o sin bucket,
+   el servicio no intenta subir y responde 503.
 2. **Subida a través del servicio.** El cliente manda el archivo por `multipart/form-data`
    (`PATCH /api/v1/users/me/profile/avatar`, `POST /api/v1/servers`); el servicio lo valida, lo normaliza
    y lo sube a S3. El binario pasa por el servicio pero nunca se persiste en él.
@@ -39,8 +42,12 @@ desnormalizada de la URL que debe mantenerse actualizada.
 ## 3. Alternativas descartadas
 
 - **Cloudinary:** era la primera implementación de avatares. Se descarta para tener un solo proveedor:
-  toda la infraestructura ya está en AWS, el rol de la instancia evita manejar API keys y el costo entra
-  en los mismos créditos y el mismo budget. Lo que se pierde (transformaciones al vuelo) se cubre
+  toda la infraestructura ya está en AWS (permisos por servicio con IAM, Terraform) y el costo entra en los
+  mismos créditos y el mismo budget.
+- **Rol IAM de la instancia (sin access keys):** evita manejar claves, pero los contenedores tienen que
+  leer la metadata de la EC2, con lo que el servicio queda atado a la máquina donde corre y comparte
+  permisos con todo lo que corra en ella. Va en contra de que cada microservicio sea desplegable por
+  separado. Lo que se pierde (transformaciones al vuelo) se cubre
   normalizando con Pillow al subir.
 - **Subida directa del cliente con *presigned POST*:** el binario no pasaría por Kong ni por el servicio,
   pero S3 no puede validar el contenido real ni normalizar la imagen, y obliga a un segundo paso para
@@ -61,7 +68,7 @@ desnormalizada de la URL que debe mantenerse actualizada.
 
 | Pieza | Estado |
 |-------|--------|
-| Bucket, policy pública por prefijo y permisos del rol edge (Terraform) | Implementado, falta `terraform apply` |
+| Bucket, policy pública por prefijo y un usuario IAM por servicio (Terraform) | Implementado, falta `terraform apply` y crear las access keys |
 | Avatar: `PATCH /api/v1/users/me/profile/avatar` → S3 | Implementado |
 | Ícono de servidor en `POST /api/v1/servers` → S3 | Implementado |
 | Evento `user.profile.updated` al cambiar avatar | Implementado |
