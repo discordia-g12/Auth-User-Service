@@ -31,9 +31,13 @@ class Settings(BaseSettings):
     password_reset_max_requests: int = 3
     password_reset_window_seconds: int = 900
 
-    cloudinary_cloud_name: str = ""
-    cloudinary_api_key: str = ""
-    cloudinary_api_secret: str = ""
+    # Avatares (S3, ADR-003). Las claves son las del usuario IAM propio del servicio: no se usa el
+    # rol ni la metadata de la EC2, así el servicio anda igual en cualquier nodo.
+    aws_region: str = "us-east-1"
+    s3_bucket: str = ""
+    s3_public_base_url: str = ""  # vacío: https://<bucket>.s3.<region>.amazonaws.com
+    aws_access_key_id: str = ""
+    aws_secret_access_key: str = ""
 
     rabbitmq_host: str = "rabbitmq"
     rabbitmq_port: int = 5672

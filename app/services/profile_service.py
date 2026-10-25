@@ -5,7 +5,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.exceptions import AvatarUploadError, UsernameTakenError, UserProfileNotFoundError
 from app.models.user_profile import UserProfile
 from app.repositories.profile_repository import ProfileRepository
-from app.services.cloudinary_service import upload_avatar as cloudinary_upload_avatar
+from app.services import storage_service
+
+AVATARS_PREFIX = "avatars"
 
 
 class ProfileService:
@@ -50,8 +52,9 @@ class ProfileService:
         if profile is None:
             raise UserProfileNotFoundError()
 
-        # Es bloqueante, lo hacemos async (espera a que el thread termine, pero sin bloquear el event loop)
-        avatar_url = await asyncio.to_thread(cloudinary_upload_avatar, contents, user_id)
+        previous_url = profile.avatar_url
+        # boto3 es bloqueante: corre en un thread para no frenar el event loop
+        avatar_url = await asyncio.to_thread(storage_service.upload_image, contents, AVATARS_PREFIX)
 
         try:
             await self.repo.update_avatar(profile, avatar_url)
@@ -66,7 +69,11 @@ class ProfileService:
             await self.db.commit()
         except Exception:
             await self.db.rollback()
+            # El avatar nuevo no quedó guardado: se borra para no dejarlo huérfano
+            await asyncio.to_thread(storage_service.delete_image, avatar_url)
             raise AvatarUploadError("Could not upload new avatar") from None
 
+        # Recién con el cambio confirmado se borra el anterior (si era nuestro; el de Auth0 no se toca)
+        await asyncio.to_thread(storage_service.delete_image, previous_url)
         await self.db.refresh(profile)
         return profile
