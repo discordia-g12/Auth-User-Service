@@ -48,14 +48,25 @@ async def user_id(db_session: AsyncSession):
     return await _create_user(db_session, _unique())
 
 
+FAKE_BASE = "https://fake-bucket.s3.us-east-1.amazonaws.com"
+
+
 @pytest.fixture(autouse=True)
-def mock_cloudinary(monkeypatch):
-    """Ningun test le pega a Cloudinary real: devolvemos una URL fake siempre."""
+def fake_storage(monkeypatch):
+    """Ningun test le pega a S3 real: las subidas devuelven una URL fake y se registran aca."""
+    calls = {"uploaded": [], "deleted": []}
 
-    def fake_upload(contents: bytes, user_id: str) -> str:
-        return f"https://res.cloudinary.com/fake/avatars/{user_id}.png"
+    def fake_upload(contents: bytes, prefix: str, content_type: str = "image/webp") -> str:
+        url = f"{FAKE_BASE}/{prefix}/{len(calls['uploaded'])}.webp"
+        calls["uploaded"].append({"url": url, "contents": contents, "prefix": prefix})
+        return url
 
-    monkeypatch.setattr("app.services.profile_service.cloudinary_upload_avatar", fake_upload)
+    def fake_delete(url):
+        calls["deleted"].append(url)
+
+    monkeypatch.setattr("app.services.storage_service.upload_image", fake_upload)
+    monkeypatch.setattr("app.services.storage_service.delete_image", fake_delete)
+    return calls
 
 
 # CA 1: Edicion exitosa (username / bio)
@@ -116,16 +127,17 @@ async def test_explicit_null_bio_clears_bio(client, db_session):
     assert response.json()["bio"] is None
 
 
-# CA 2: Foto de perfil actualizada (avatar via Cloudinary)
+# CA 2: Foto de perfil actualizada (avatar en S3)
 
 
-async def test_upload_avatar_success_updates_profile(client, db_session, user_id):
+async def test_upload_avatar_success_updates_profile(client, db_session, user_id, fake_storage):
     files = {"file": ("avatar.png", _fake_image_bytes("PNG"), "image/png")}
     response = await client.patch(URL_AVATAR, files=files, headers=_headers(user_id))
 
     assert response.status_code == 200
     body = response.json()
-    assert body["avatar_url"] == f"https://res.cloudinary.com/fake/avatars/{user_id}.png"
+    assert body["avatar_url"] == fake_storage["uploaded"][-1]["url"]
+    assert fake_storage["uploaded"][-1]["prefix"] == "avatars"
 
     profile = await db_session.get(UserProfile, user_id)
     db_session.expire(profile)
@@ -140,6 +152,49 @@ async def test_upload_avatar_accepts_jpeg_and_webp(client, db_session, user_id):
         assert response.status_code == 200
 
 
+async def test_upload_avatar_is_stored_as_256px_webp(client, user_id, fake_storage):
+    """La imagen se normaliza antes de subirla: mismo formato y tamaño para todos los avatares."""
+    files = {"file": ("avatar.jpg", _fake_image_bytes("JPEG"), "image/jpeg")}
+    await client.patch(URL_AVATAR, files=files, headers=_headers(user_id))
+
+    stored = Image.open(io.BytesIO(fake_storage["uploaded"][-1]["contents"]))
+    assert stored.format == "WEBP"
+    assert stored.size == (256, 256)
+
+
+async def test_new_avatar_deletes_previous_one(client, user_id, fake_storage):
+    files = {"file": ("avatar.png", _fake_image_bytes("PNG"), "image/png")}
+    first = (await client.patch(URL_AVATAR, files=files, headers=_headers(user_id))).json()["avatar_url"]
+    second = (await client.patch(URL_AVATAR, files=files, headers=_headers(user_id))).json()["avatar_url"]
+
+    assert first != second
+    assert fake_storage["deleted"][-1] == first
+
+
+async def test_upload_avatar_storage_down_returns_503_and_keeps_profile(client, db_session, user_id, monkeypatch):
+    from app.exceptions import StorageUnavailableError
+
+    def broken_upload(*args, **kwargs):
+        raise StorageUnavailableError()
+
+    monkeypatch.setattr("app.services.storage_service.upload_image", broken_upload)
+    files = {"file": ("avatar.png", _fake_image_bytes("PNG"), "image/png")}
+    response = await client.patch(URL_AVATAR, files=files, headers=_headers(user_id))
+
+    assert response.status_code == 503
+    profile = await db_session.get(UserProfile, user_id)
+    assert profile.avatar_url is None
+
+
+async def test_upload_avatar_rejects_huge_dimensions(client, user_id, monkeypatch):
+    from app.services import avatar_validator
+
+    monkeypatch.setattr(avatar_validator, "MAX_PIXELS", 50)  # 10x10 supera el limite
+    files = {"file": ("avatar.png", _fake_image_bytes("PNG"), "image/png")}
+    response = await client.patch(URL_AVATAR, files=files, headers=_headers(user_id))
+    assert response.status_code == 422
+
+
 async def test_upload_avatar_emits_outbox_event(client, db_session, user_id):
     """CA 2 (se sube la imagen) + integracion con el patron Outbox / RabbitMQ."""
     files = {"file": ("avatar.png", _fake_image_bytes("PNG"), "image/png")}
@@ -151,8 +206,34 @@ async def test_upload_avatar_emits_outbox_event(client, db_session, user_id):
     assert len(events) == 1
     assert events[0].event_type == "user.profile.updated"
     assert events[0].aggregate_type == "user_profile"
-    assert events[0].payload["avatar_url"].startswith("https://res.cloudinary.com/")
+    assert events[0].payload["avatar_url"].startswith(f"{FAKE_BASE}/avatars/")
     assert events[0].processed_at is None
+
+
+async def test_update_profile_emits_outbox_event(client, db_session, user_id):
+    """Editar nombre/bio/estado avisa igual que el avatar, para que los demás lo vean actualizado."""
+    payload = {"display_name": "Nuevo Nombre", "custom_status": "jugando"}
+    await client.patch(URL_PROFILE, json=payload, headers=_headers(user_id))
+
+    result = await db_session.execute(select(OutboxEvent).where(OutboxEvent.aggregate_id == user_id))
+    events = result.scalars().all()
+
+    assert len(events) == 1
+    assert events[0].event_type == "user.profile.updated"
+    assert events[0].payload == {"user_id": user_id, **payload}
+    assert events[0].processed_at is None
+
+
+async def test_rejected_update_does_not_emit_outbox_event(client, db_session, user_id):
+    """Si el cambio no se guarda (username ocupado), tampoco queda el evento."""
+    taken = _unique("ocupado")
+    await _create_user(db_session, taken)
+
+    response = await client.patch(URL_PROFILE, json={"username": taken}, headers=_headers(user_id))
+
+    assert response.status_code == 409
+    result = await db_session.execute(select(OutboxEvent).where(OutboxEvent.aggregate_id == user_id))
+    assert result.scalars().all() == []
 
 
 # CA 3: Datos invalidos (aplica tanto a username/bio como a la imagen)

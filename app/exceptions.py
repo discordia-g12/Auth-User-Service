@@ -130,6 +130,16 @@ class InvalidAvatarError(UnprocessableEntityError):
         super().__init__(detail)
 
 
+class StorageUnavailableError(AppException):
+    """The image storage (S3) could not save the file. The cause is logged, never returned."""
+
+    status_code = 503
+    title = "Service Unavailable"
+
+    def __init__(self, detail: str = "The image could not be stored. Try again later."):
+        super().__init__(detail)
+
+
 class AvatarUploadError(AppException):
     status_code = 500
     title = "Avatar Upload Failed"
@@ -148,6 +158,7 @@ __all__ = [
     "IdentityProviderUnavailableError",
     "NotFoundError",
     "PasswordResetThrottledError",
+    "StorageUnavailableError",
     "UnauthorizedError",
     "UnprocessableEntityError",
     "UserAlreadyExistsError",
