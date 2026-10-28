@@ -24,8 +24,8 @@ desnormalizada de la URL que debe mantenerse actualizada.
    llevándose sus claves, y uno comprometido no puede tocar las imágenes del otro. Sin claves o sin bucket,
    el servicio no intenta subir y responde 503.
 2. **Subida a través del servicio.** El cliente manda el archivo por `multipart/form-data`
-   (`PATCH /api/v1/users/me/profile/avatar`, `POST /api/v1/servers`); el servicio lo valida, lo normaliza
-   y lo sube a S3. El binario pasa por el servicio pero nunca se persiste en él.
+   (`PATCH /api/v1/users/me/profile/avatar`, `POST /api/v1/servers`, `PUT /api/v1/servers/{id}/icon`); el
+   servicio lo valida, lo normaliza y lo sube a S3. El binario pasa por el servicio pero nunca se persiste en él.
 3. **Validación y normalización en el backend (Pillow):** se valida el contenido real, no el
    `Content-Type`: JPEG, PNG o WebP, hasta 5 MB y 4096×4096 px. La imagen se recorta al centro y se guarda
    como WebP de 256×256: todas pesan poco, se ven iguales y pierden los metadatos (EXIF con ubicación).
@@ -72,8 +72,8 @@ desnormalizada de la URL que debe mantenerse actualizada.
 | Avatar: `PATCH /api/v1/users/me/profile/avatar` → S3 | Implementado |
 | Ícono de servidor en `POST /api/v1/servers` → S3 | Implementado |
 | Evento `user.profile.updated` al cambiar avatar | Implementado |
-| Cambiar o quitar el ícono de un servidor existente | Pendiente |
+| Cambiar o quitar el ícono de un servidor existente (`PUT` / `DELETE /api/v1/servers/{id}/icon`, dueño o Gestionar servidor, evento `server.updated`) | Implementado |
 | `avatar_url` en el alta (`POST /api/v1/users/me`) | Valida solo la longitud (≤ 500). **Todavía no restringe el dominio de la URL.** |
-| Frontend (subir avatar, mandar el ícono como archivo) | Pendiente (refactor en curso) |
+| Clientes web y mobile (avatar, ícono al crear y desde Ajustes del servidor) | Implementado |
 
 Lo pendiente está detallado en `docs/DEUDA-TECNICA.md` del orquestador.
