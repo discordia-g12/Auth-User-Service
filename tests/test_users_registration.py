@@ -248,3 +248,15 @@ async def test_federated_login_links_existing_account_by_verified_email(
     assert post_res.json()["username"] == "existing_owner"
     assert post_res.json()["user_id"] == auth_headers["X-User-Id"]
 
+    # POST /bulk resolves the linked federated identity alias to the same profile
+    bulk_res = await client.post(
+        "/api/v1/users/bulk",
+        json={"user_ids": [federated_headers["X-User-Id"], auth_headers["X-User-Id"]]},
+        headers=federated_headers,
+    )
+    assert bulk_res.status_code == 200
+    by_id = {u["user_id"]: u for u in bulk_res.json()}
+    assert by_id[federated_headers["X-User-Id"]]["username"] == "existing_owner"
+    assert by_id[auth_headers["X-User-Id"]]["username"] == "existing_owner"
+
+

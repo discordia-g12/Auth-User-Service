@@ -28,6 +28,8 @@ class UserService:
             existing_user = await self.user_repo.get_user_by_email(session, email)
 
         if existing_user is not None and existing_user.profile is not None:
+            if existing_user.id != user_id:
+                await self.user_repo.ensure_identity_alias(session, user_id, existing_user.id)
             logger.info("user_already_registered_idempotent", user_id=user_id, resolved_user_id=existing_user.id)
             profile = existing_user.profile
             return UserProfileResponse(
@@ -93,6 +95,7 @@ class UserService:
         if user is None and email and email_verified:
             user = await self.user_repo.get_user_by_email(session, email)
             if user is not None:
+                await self.user_repo.ensure_identity_alias(session, user_id, user.id)
                 logger.info("user_linked_by_verified_email", user_id=user_id, existing_user_id=user.id)
         if user is None or user.profile is None:
             logger.warning("user_profile_not_found", user_id=user_id)
@@ -112,8 +115,9 @@ class UserService:
 
 
     async def get_users_bulk(self, session: AsyncSession, user_ids: list[str]) -> list[UserProfileResponse]:
-        """Retrieves profiles for a list of user IDs."""
+        """Retrieves profiles for a list of user IDs, including linked federated aliases."""
         users = await self.user_repo.get_users_by_ids(session, user_ids)
+        found_ids = {user.id for user in users}
         responses = []
         for user in users:
             if user.profile is not None:
@@ -128,4 +132,20 @@ class UserService:
                     custom_status=profile.custom_status,
                     created_at=user.created_at,
                 ))
+        missing_ids = [uid for uid in user_ids if uid not in found_ids]
+        if missing_ids:
+            aliased = await self.user_repo.get_aliased_users_by_ids(session, missing_ids)
+            for alias_id, user in aliased.items():
+                if user.profile is not None:
+                    profile = user.profile
+                    responses.append(UserProfileResponse(
+                        user_id=alias_id,
+                        username=profile.username,
+                        display_name=profile.display_name,
+                        avatar_url=profile.avatar_url,
+                        bio=profile.bio,
+                        activity_status=profile.activity_status,
+                        custom_status=profile.custom_status,
+                        created_at=user.created_at,
+                    ))
         return responses
