@@ -9,6 +9,7 @@ from app.db.base import Base
 
 if TYPE_CHECKING:
     from app.models.user_profile import UserProfile
+    from app.models.user_two_factor import UserTwoFactor
 
 
 class User(Base):
@@ -24,6 +25,13 @@ class User(Base):
 
     profile: Mapped["UserProfile"] = relationship(
         "UserProfile",
+        back_populates="user",
+        uselist=False,
+        cascade="all, delete-orphan",
+        lazy="selectin",
+    )
+    two_factor: Mapped["UserTwoFactor | None"] = relationship(
+        "UserTwoFactor",
         back_populates="user",
         uselist=False,
         cascade="all, delete-orphan",
