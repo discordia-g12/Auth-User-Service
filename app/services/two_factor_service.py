@@ -225,7 +225,8 @@ class TwoFactorService:
             if user_id.startswith("google-oauth2|"):
                 raise BadRequestError("El código de verificación o de recuperación es incorrecto.")
             raise BadRequestError(
-                "La confirmación es incorrecta. Ingresá tu contraseña actual, tu código de 6 dígitos o un código de recuperación."
+                "La confirmación es incorrecta. "
+                "Ingresá tu contraseña actual, tu código de 6 dígitos o un código de recuperación."
             )
 
         await self._repo.create_or_update(
