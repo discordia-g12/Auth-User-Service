@@ -220,3 +220,43 @@ async def test_register_profile_validation_null_bytes(client: AsyncClient, auth_
     assert res.status_code == 400
     data = res.json()
     assert "cannot contain null characters" in data["detail"]
+
+
+@pytest.mark.asyncio
+async def test_federated_login_links_existing_account_by_verified_email(
+    client: AsyncClient, auth_headers: dict[str, str]
+):
+    """CA 2 (HU 33): Federated identity with same verified email resolves existing account without conflict."""
+    created = await client.post("/api/v1/users/me", json={"username": "existing_owner"}, headers=auth_headers)
+    assert created.status_code == 201
+
+    federated_headers = {
+        "X-User-Id": "google-oauth2|116070728056737622244",
+        "X-User-Email": auth_headers["X-User-Email"],
+        "X-User-Email-Verified": "true",
+    }
+
+    # GET /me resolves the existing profile by verified email
+    get_res = await client.get("/api/v1/users/me", headers=federated_headers)
+    assert get_res.status_code == 200
+    assert get_res.json()["username"] == "existing_owner"
+    assert get_res.json()["user_id"] == auth_headers["X-User-Id"]
+
+    # POST /me is also idempotent and does not raise 409 on email uniqueness
+    post_res = await client.post("/api/v1/users/me", json={"username": "any_other_name"}, headers=federated_headers)
+    assert post_res.status_code == 201
+    assert post_res.json()["username"] == "existing_owner"
+    assert post_res.json()["user_id"] == auth_headers["X-User-Id"]
+
+    # POST /bulk resolves the linked federated identity alias to the same profile
+    bulk_res = await client.post(
+        "/api/v1/users/bulk",
+        json={"user_ids": [federated_headers["X-User-Id"], auth_headers["X-User-Id"]]},
+        headers=federated_headers,
+    )
+    assert bulk_res.status_code == 200
+    by_id = {u["user_id"]: u for u in bulk_res.json()}
+    assert by_id[federated_headers["X-User-Id"]]["username"] == "existing_owner"
+    assert by_id[auth_headers["X-User-Id"]]["username"] == "existing_owner"
+
+
