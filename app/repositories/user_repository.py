@@ -15,6 +15,12 @@ class UserRepository:
         """Retrieves a user by opaque identifier along with eager profile relation."""
         return await session.get(User, user_id)
 
+    async def get_user_by_email(self, session: AsyncSession, email: str) -> User | None:
+        """Retrieves a user by email address along with eager profile relation."""
+        stmt = select(User).where(User.email == email)
+        result = await session.execute(stmt)
+        return result.scalar_one_or_none()
+
     async def get_profile_by_username(self, session: AsyncSession, username: str) -> UserProfile | None:
         """Retrieves a user profile by username to check uniqueness."""
         stmt = select(UserProfile).where(UserProfile.username == username)

@@ -97,6 +97,8 @@ async def get_my_profile(
     return await user_service.get_my_profile(
         session=db,
         user_id=identity.user_id,
+        email=identity.email,
+        email_verified=identity.email_verified,
     )
 
 

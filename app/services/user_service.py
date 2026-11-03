@@ -24,8 +24,11 @@ class UserService:
         no_null_bytes(request.avatar_url, "avatar_url")
 
         existing_user = await self.user_repo.get_user_by_id(session, user_id)
+        if existing_user is None:
+            existing_user = await self.user_repo.get_user_by_email(session, email)
+
         if existing_user is not None and existing_user.profile is not None:
-            logger.info("user_already_registered_idempotent", user_id=user_id)
+            logger.info("user_already_registered_idempotent", user_id=user_id, resolved_user_id=existing_user.id)
             profile = existing_user.profile
             return UserProfileResponse(
                 user_id=existing_user.id,
@@ -78,9 +81,19 @@ class UserService:
             created_at=user.created_at,
         )
 
-    async def get_my_profile(self, session: AsyncSession, user_id: str) -> UserProfileResponse:
-        """Retrieves profile of the currently authenticated user."""
+    async def get_my_profile(
+        self,
+        session: AsyncSession,
+        user_id: str,
+        email: str | None = None,
+        email_verified: bool = False,
+    ) -> UserProfileResponse:
+        """Retrieves profile of the currently authenticated user, linking by verified email if needed."""
         user = await self.user_repo.get_user_by_id(session, user_id)
+        if user is None and email and email_verified:
+            user = await self.user_repo.get_user_by_email(session, email)
+            if user is not None:
+                logger.info("user_linked_by_verified_email", user_id=user_id, existing_user_id=user.id)
         if user is None or user.profile is None:
             logger.warning("user_profile_not_found", user_id=user_id)
             raise UserProfileNotFoundError()
