@@ -19,3 +19,7 @@ python-multipart==0.0.12  # UploadFile en FastAPI
 
 # Broker: relay del outbox (ADR-005)
 aio-pika==9.4.3
+
+# Autenticación de dos factores (2FA / TOTP)
+pyotp==2.10.0
+qrcode[pil]==8.2
