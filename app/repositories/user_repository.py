@@ -1,3 +1,4 @@
+from datetime import UTC, datetime
 from typing import Any
 
 from sqlalchemy import select
@@ -78,3 +79,55 @@ class UserRepository:
         stmt = select(User).where(User.id.in_(user_ids))
         result = await session.execute(stmt)
         return list(result.scalars().all())
+
+    async def ensure_identity_alias(
+        self, session: AsyncSession, alias_id: str, primary_user_id: str
+    ) -> None:
+        """Persists a federated identity alias mapping to the primary user ID if not already stored."""
+        if not alias_id or alias_id == primary_user_id:
+            return
+        stmt = select(OutboxEvent).where(
+            OutboxEvent.aggregate_type == "user_identity_alias",
+            OutboxEvent.aggregate_id == alias_id,
+        )
+        existing = (await session.execute(stmt)).scalar_one_or_none()
+        if existing is None:
+            session.add(
+                OutboxEvent(
+                    aggregate_type="user_identity_alias",
+                    aggregate_id=alias_id,
+                    event_type="user.identity_linked",
+                    payload={"primary_user_id": primary_user_id},
+                    processed_at=datetime.now(UTC),
+                )
+            )
+            await session.commit()
+
+    async def get_aliased_users_by_ids(
+        self, session: AsyncSession, alias_ids: list[str]
+    ) -> dict[str, User]:
+        """Resolves federated alias IDs to their linked primary User records."""
+        if not alias_ids:
+            return {}
+        stmt = select(OutboxEvent).where(
+            OutboxEvent.aggregate_type == "user_identity_alias",
+            OutboxEvent.aggregate_id.in_(alias_ids),
+        )
+        events = list((await session.execute(stmt)).scalars().all())
+        if not events:
+            return {}
+        alias_to_primary: dict[str, str] = {}
+        for ev in events:
+            if isinstance(ev.payload, dict):
+                prim_id = ev.payload.get("primary_user_id")
+                if isinstance(prim_id, str) and prim_id:
+                    alias_to_primary[ev.aggregate_id] = prim_id
+        if not alias_to_primary:
+            return {}
+        primary_users = await self.get_users_by_ids(session, list(set(alias_to_primary.values())))
+        primary_by_id = {u.id: u for u in primary_users}
+        return {
+            alias_id: primary_by_id[prim_id]
+            for alias_id, prim_id in alias_to_primary.items()
+            if prim_id in primary_by_id
+        }
