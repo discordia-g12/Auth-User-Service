@@ -1,7 +1,7 @@
 from datetime import UTC, datetime
 from typing import Any
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.outbox import OutboxEvent
@@ -73,6 +73,46 @@ class UserRepository:
 
         return user, profile
 
+
+    async def find_user_by_identifier(self, session: AsyncSession, identifier: str) -> User | None:
+        """Staff lookup: "@username", an email (case-insensitive), a user id or a bare username."""
+        value = identifier.strip()
+        if not value:
+            return None
+        if value.startswith("@"):
+            return await self._get_user_by_username(session, value[1:])
+        if "@" in value:
+            stmt = select(User).where(func.lower(User.email) == value.lower())
+            return (await session.execute(stmt)).scalar_one_or_none()
+        user = await self.get_user_by_id(session, value)
+        if user is not None:
+            return user
+        return await self._get_user_by_username(session, value)
+
+    async def _get_user_by_username(self, session: AsyncSession, username: str) -> User | None:
+        stmt = select(User).join(UserProfile, UserProfile.user_id == User.id).where(UserProfile.username == username)
+        return (await session.execute(stmt)).scalar_one_or_none()
+
+    async def get_alias_ids(self, session: AsyncSession, primary_user_id: str) -> list[str]:
+        """Federated identities linked to a user (see ensure_identity_alias)."""
+        stmt = select(OutboxEvent).where(OutboxEvent.aggregate_type == "user_identity_alias")
+        events = (await session.execute(stmt)).scalars().all()
+        return [
+            ev.aggregate_id
+            for ev in events
+            if isinstance(ev.payload, dict) and ev.payload.get("primary_user_id") == primary_user_id
+        ]
+
+    async def list_suspended_users(self, session: AsyncSession) -> list[User]:
+        """Suspended accounts, most recent first."""
+        stmt = select(User).where(User.is_suspended.is_(True)).order_by(User.suspended_at.desc())
+        return list((await session.execute(stmt)).scalars().all())
+
+    def add_outbox_event(
+        self, session: AsyncSession, user_id: str, event_type: str, payload: dict[str, Any]
+    ) -> None:
+        """Queues a domain event in the same transaction as the change (ADR-005)."""
+        session.add(OutboxEvent(aggregate_type="user", aggregate_id=user_id, event_type=event_type, payload=payload))
 
     async def get_users_by_ids(self, session: AsyncSession, user_ids: list[str]) -> list[User]:
         """Retrieves multiple users by their IDs."""

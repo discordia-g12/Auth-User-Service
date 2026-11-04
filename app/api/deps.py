@@ -6,8 +6,10 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.session import get_db
-from app.exceptions import UnauthorizedError
+from app.exceptions import StaffOnlyError, UnauthorizedError
 from app.models.user import User
+
+PLATFORM_STAFF_ROLE = "staff"
 
 
 @dataclass(frozen=True)
@@ -22,6 +24,8 @@ class AuthenticatedIdentity:
     user_id: str
     email: str | None = None
     email_verified: bool = False
+    # Platform role (claim https://discordia.app/role, propagated by Kong as X-User-Role)
+    role: str = "user"
 
 
 def _parse_bool_header(value: str | None) -> bool:
@@ -33,6 +37,7 @@ async def get_authenticated_identity(
     x_user_id: str | None = Header(default=None, alias="X-User-Id"),
     x_user_email: str | None = Header(default=None, alias="X-User-Email"),
     x_user_email_verified: str | None = Header(default=None, alias="X-User-Email-Verified"),
+    x_user_role: str | None = Header(default=None, alias="X-User-Role"),
 ) -> AuthenticatedIdentity:
     """Extracts and validates identity headers injected by Kong Gateway."""
     if not x_user_id:
@@ -42,7 +47,21 @@ async def get_authenticated_identity(
         user_id=x_user_id,
         email=x_user_email,
         email_verified=_parse_bool_header(x_user_email_verified),
+        role=(x_user_role or "user").strip(),
     )
+
+
+async def require_staff(
+    identity: Annotated[AuthenticatedIdentity, Depends(get_authenticated_identity)],
+) -> AuthenticatedIdentity:
+    """Staff endpoints: 403 unless X-User-Role is exactly "staff" (fails closed on anything else).
+
+    Kong already enforces validate("staff") on /api/v1/admin/*; this second check keeps a mistake in
+    kong.yml from opening the backoffice (Gateway ADR-002, rule 2).
+    """
+    if identity.role != PLATFORM_STAFF_ROLE:
+        raise StaffOnlyError()
+    return identity
 
 
 async def get_current_user_id(
@@ -62,3 +81,4 @@ async def get_current_user_id(
 DbSession = Annotated[AsyncSession, Depends(get_db)]
 CurrentIdentity = Annotated[AuthenticatedIdentity, Depends(get_authenticated_identity)]
 CurrentUserId = Annotated[str, Depends(get_current_user_id)]
+StaffIdentity = Annotated[AuthenticatedIdentity, Depends(require_staff)]

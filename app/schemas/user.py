@@ -45,6 +45,9 @@ class UserProfileResponse(BaseModel):
     activity_status: str = Field(default="offline", description="Real-time activity status")
     custom_status: str | None = Field(default=None, description="Custom status message")
     created_at: datetime = Field(..., description="Creation timestamp in ISO 8601 format")
+    is_suspended: bool = Field(
+        default=False, description="Suspended by the platform: the public profile is not available"
+    )
 
 
 class BulkUserRequest(BaseModel):

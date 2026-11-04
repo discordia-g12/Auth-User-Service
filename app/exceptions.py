@@ -125,6 +125,34 @@ class IdentityProviderUnavailableError(AppException):
         super().__init__(detail)
 
 
+class StaffOnlyError(ForbiddenError):
+    """Second barrier for staff endpoints. The first one is validate("staff") in Kong (Gateway ADR-002)."""
+
+    type = f"{PROBLEM_TYPE_BASE}/staff-only"
+
+    def __init__(self, detail: str = "Only platform staff can perform this action."):
+        super().__init__(detail)
+
+
+class AccountSuspendedError(ForbiddenError):
+    """The account was suspended by platform staff. Clients show the suspended screen."""
+
+    type = f"{PROBLEM_TYPE_BASE}/account-suspended"
+
+    def __init__(self, detail: str = "This account has been suspended by the platform."):
+        super().__init__(detail)
+
+
+class SuspensionDenylistUnavailableError(AppException):
+    """The Gateway denylist (Redis) could not be updated. The cause is logged, never returned."""
+
+    status_code = 503
+    title = "Service Unavailable"
+
+    def __init__(self, detail: str = "The suspension could not be applied right now. Try again later."):
+        super().__init__(detail)
+
+
 class InvalidAvatarError(UnprocessableEntityError):
     def __init__(self, detail: str = "Invalid avatar file or format provided."):
         super().__init__(detail)
@@ -150,6 +178,7 @@ class AvatarUploadError(AppException):
 
 __all__ = [
     "PROBLEM_TYPE_BASE",
+    "AccountSuspendedError",
     "AppException",
     "BadRequestError",
     "ConflictError",
@@ -158,7 +187,9 @@ __all__ = [
     "IdentityProviderUnavailableError",
     "NotFoundError",
     "PasswordResetThrottledError",
+    "StaffOnlyError",
     "StorageUnavailableError",
+    "SuspensionDenylistUnavailableError",
     "UnauthorizedError",
     "UnprocessableEntityError",
     "UserAlreadyExistsError",

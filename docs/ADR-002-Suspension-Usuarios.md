@@ -1,6 +1,7 @@
 # ADR-002: Suspensión de usuarios y corte de sesiones
 
-- **Estado:** Propuesto (no implementado; ver §5)
+- **Estado:** Aceptado. Implementado en este servicio (endpoint, Auth0, lista de bloqueados y evento); el
+  chequeo en Kong y los consumidores de Chat y Voz van en sus repos (ver §5)
 - **Fecha:** 2026-09-27
 - **Alcance:** `auth-user-service`, API Gateway (Kong), Auth0, Chat Engine, Voice Signaling
 - **Reemplaza a:** `ADR-01-Suspended-Users.md`, que suponía refresh tokens y un `token_revoked_at` almacenados en este servicio. Eso es incompatible con ADR-001: las sesiones y los refresh tokens viven en Auth0.
@@ -38,6 +39,28 @@ de pasos: bloqueo en Auth0 → clave en Redis → `is_suspended` + evento `user.
 transacción. Si falla alguno de los dos primeros pasos, la operación falla completa y se reintenta.
 La reactivación hace lo inverso.
 
+### Detalles de la implementación (03/11/2026)
+
+- **Endpoints** (solo staff, con segundo chequeo de `X-User-Role` en el servicio):
+  `POST /api/v1/admin/users/suspensions` (`{"user": "email, @usuario o id", "reason": "..."}`),
+  `DELETE /api/v1/admin/users/{user_id}/suspension` y `GET /api/v1/admin/users/suspended`. El motivo, la fecha
+  y quién suspendió se guardan en `users` (`suspension_reason`, `suspended_at`, `suspended_by`).
+- **Identidades federadas.** Una persona puede tener varias identidades de Auth0 con el mismo email
+  (contraseña y Google), unificadas como alias. Se bloquean en Auth0 y se agregan a la lista **todas**:
+  el id del usuario y sus alias. El evento las manda en `identities`.
+- **Claves en el Redis del Gateway:**
+  - `suspended:sub:<id>` por identidad, con TTL igual a la vida del access token
+    (`SUSPENSION_DENYLIST_TTL_SECONDS`, por defecto 86400, el valor por defecto de Auth0);
+  - `suspended:email:<email en minúsculas>`, **sin TTL** hasta la reactivación. Cubre una identidad federada
+    nueva con el mismo email, que Auth0 no sabe que está suspendida.
+  Kong rechaza el pedido si existe cualquiera de las dos.
+- **Perfil.** `GET /users/me` de una cuenta suspendida responde `403` con `type` `account-suspended`, y
+  `POST /users/bulk` devuelve solo su nombre con `is_suspended: true` (perfil no disponible). El nombre se
+  conserva para que los mensajes anteriores sigan mostrando quién los escribió.
+- **Redis con política de evicción.** El Redis del Gateway se usa también para el rate limiting. Con
+  `allkeys-lru` podría descartar una clave de suspensión al llenarse; por eso pasa a `volatile-lru`, que solo
+  descarta claves con TTL. La clave por email, sin TTL, nunca se descarta.
+
 ## 3. Alternativas descartadas
 
 - **Blacklist por `jti`:** exige conocer cada token emitido, lo que es inviable con Auth0 como emisor.
@@ -56,9 +79,11 @@ La reactivación hace lo inverso.
 
 | Pieza | Estado |
 |-------|--------|
-| Columna `users.is_suspended` | Implementada (default `false`) |
-| Endpoint de suspensión (staff) | Pendiente |
-| Integración con Auth0 Management API | Pendiente |
-| Denylist en Redis y chequeo en `auth0_validator.lua` | Pendiente |
-| Evento `user.suspended` y sus consumidores | Pendiente (requiere el relay de ADR-005) |
-| Vida del access token en Auth0 | Pendiente de fijar el valor |
+| Columna `users.is_suspended`, más motivo, fecha y quién suspendió | Implementado |
+| Endpoints de suspensión, reactivación y listado (staff) | Implementado (con tests) |
+| Integración con Auth0 Management API | Implementado; falta crear la aplicación M2M en Auth0 y cargar sus credenciales |
+| Escritura de la lista de bloqueados en Redis | Implementado |
+| Chequeo de la lista en `auth0_validator.lua` | En el repo del Gateway |
+| Evento `user.suspended` / `user.reactivated` | Publicado por el Outbox (ADR-005) |
+| Consumidores en Chat Engine y Voice Signaling | En sus repos |
+| Vida del access token en Auth0 | Pendiente de acortar (5–15 min); hoy se asume el valor por defecto, 24 h |

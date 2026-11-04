@@ -28,6 +28,19 @@ class Settings(BaseSettings):
     auth0_db_connection: str = "Username-Password-Authentication"
     auth0_timeout_seconds: float = 5.0
 
+    # Management API de Auth0, para bloquear y desbloquear cuentas al suspender (ADR-002). Es una aplicación
+    # Machine to Machine con read:users y update:users. Sin credenciales, suspender responde 503.
+    auth0_mgmt_client_id: str = ""
+    auth0_mgmt_client_secret: str = ""
+
+    # Redis del Gateway: lista de cuentas suspendidas que consulta auth0_validator.lua (ADR-002)
+    gateway_redis_host: str = "gateway-redis"
+    gateway_redis_port: int = 6379
+    gateway_redis_timeout_seconds: float = 2.0
+    # Vida máxima del access token (API de Auth0, 86400 s por defecto). Las claves por identidad duran eso:
+    # después ningún token anterior a la suspensión sigue vigente y Auth0 ya no emite nuevos
+    suspension_denylist_ttl_seconds: int = 86400
+
     password_reset_max_requests: int = 3
     password_reset_window_seconds: int = 900
 
