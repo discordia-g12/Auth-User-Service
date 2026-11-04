@@ -7,7 +7,7 @@ from app.api.deps import AuthenticatedIdentity, get_authenticated_identity
 from app.db.session import get_db
 from app.exceptions import BadRequestError, EmailNotVerifiedError
 from app.schemas.problem import ProblemDetails
-from app.schemas.user import BulkUserRequest, CreateUserProfileRequest, UserProfileResponse
+from app.schemas.user import BulkUserRequest, CreateUserProfileRequest, ResolveIdentityResponse, UserProfileResponse
 from app.services.user_service import UserService
 
 router = APIRouter(prefix="/users", tags=["Users"])
@@ -95,6 +95,26 @@ async def get_my_profile(
 ) -> UserProfileResponse:
     """Retrieves profile of the currently authenticated user."""
     return await user_service.get_my_profile(
+        session=db,
+        user_id=identity.user_id,
+        email=identity.email,
+        email_verified=identity.email_verified,
+    )
+
+
+@router.get(
+    "/resolve-identity",
+    status_code=status.HTTP_200_OK,
+    response_model=ResolveIdentityResponse,
+    summary="Resolve canonical user ID for an authenticated identity",
+    description="Resolves a federated or primary subject to its canonical user ID by verified email.",
+)
+async def resolve_identity(
+    identity: Annotated[AuthenticatedIdentity, Depends(get_authenticated_identity)],
+    db: Annotated[AsyncSession, Depends(get_db)],
+) -> ResolveIdentityResponse:
+    """Resolves canonical user ID for Gateway identity unification."""
+    return await user_service.resolve_identity(
         session=db,
         user_id=identity.user_id,
         email=identity.email,

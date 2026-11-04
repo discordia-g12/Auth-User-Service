@@ -236,6 +236,11 @@ async def test_federated_login_links_existing_account_by_verified_email(
         "X-User-Email-Verified": "true",
     }
 
+    # GET /resolve-identity resolves the federated identity to the canonical primary user_id
+    resolve_res = await client.get("/api/v1/users/resolve-identity", headers=federated_headers)
+    assert resolve_res.status_code == 200
+    assert resolve_res.json() == {"user_id": auth_headers["X-User-Id"], "found": True}
+
     # GET /me resolves the existing profile by verified email
     get_res = await client.get("/api/v1/users/me", headers=federated_headers)
     assert get_res.status_code == 200
