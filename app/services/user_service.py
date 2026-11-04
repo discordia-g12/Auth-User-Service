@@ -4,7 +4,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.logger import get_logger
 from app.exceptions import ConflictError, UserAlreadyExistsError, UsernameConflictError, UserProfileNotFoundError
 from app.repositories.user_repository import UserRepository
-from app.schemas.user import CreateUserProfileRequest, UserProfileResponse
+from app.schemas.user import CreateUserProfileRequest, ResolveIdentityResponse, UserProfileResponse
 from app.services.validation import no_null_bytes
 
 logger = get_logger(__name__)
@@ -112,6 +112,26 @@ class UserService:
             custom_status=profile.custom_status,
             created_at=user.created_at,
         )
+
+    async def resolve_identity(
+        self,
+        session: AsyncSession,
+        user_id: str,
+        email: str | None = None,
+        email_verified: bool = False,
+    ) -> ResolveIdentityResponse:
+        """Resolves an external IdP subject and verified email to the canonical user ID."""
+        user = await self.user_repo.get_user_by_id(session, user_id)
+        if user is not None:
+            return ResolveIdentityResponse(user_id=user.id, found=True)
+        if email and email_verified:
+            user = await self.user_repo.get_user_by_email(session, email)
+            if user is not None:
+                await self.user_repo.ensure_identity_alias(session, user_id, user.id)
+                logger.info("identity_resolved_by_verified_email", user_id=user_id, canonical_user_id=user.id)
+                return ResolveIdentityResponse(user_id=user.id, found=True)
+        return ResolveIdentityResponse(user_id=user_id, found=False)
+
 
 
     async def get_users_bulk(self, session: AsyncSession, user_ids: list[str]) -> list[UserProfileResponse]:
