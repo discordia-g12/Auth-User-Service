@@ -49,3 +49,9 @@ class UserProfileResponse(BaseModel):
 
 class BulkUserRequest(BaseModel):
     user_ids: list[str] = Field(..., max_length=100, description="List of user IDs to fetch")
+
+
+class ResolveIdentityResponse(BaseModel):
+    user_id: str = Field(..., description="Canonical user ID resolved for this identity")
+    found: bool = Field(..., description="Whether an existing user record was found")
+
