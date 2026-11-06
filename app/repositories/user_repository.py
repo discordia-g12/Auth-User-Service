@@ -22,6 +22,21 @@ class UserRepository:
         result = await session.execute(stmt)
         return result.scalar_one_or_none()
 
+    async def find_user_by_email(self, session: AsyncSession, email: str) -> User | None:
+        """Case-insensitive lookup. `users.email` is only unique as written, so it never expects a single row."""
+        stmt = select(User).where(func.lower(User.email) == email.lower()).order_by(User.id)
+        return (await session.execute(stmt)).scalars().first()
+
+    async def find_user_by_username(self, session: AsyncSession, username: str) -> User | None:
+        """Case-insensitive lookup. `username` is only unique as written: an exact match wins over the others."""
+        stmt = (
+            select(User)
+            .join(UserProfile, UserProfile.user_id == User.id)
+            .where(func.lower(UserProfile.username) == username.lower())
+            .order_by((UserProfile.username == username).desc(), UserProfile.username)
+        )
+        return (await session.execute(stmt)).scalars().first()
+
     async def get_profile_by_username(self, session: AsyncSession, username: str) -> UserProfile | None:
         """Retrieves a user profile by username to check uniqueness."""
         stmt = select(UserProfile).where(UserProfile.username == username)
@@ -142,6 +157,15 @@ class UserRepository:
                 )
             )
             await session.commit()
+
+    async def resolve_canonical_user(self, session: AsyncSession, user_id: str) -> User | None:
+        """The user behind an id that can be canonical or a federated alias. None if it is neither."""
+        if "\x00" in user_id:
+            return None
+        user = await self.get_user_by_id(session, user_id)
+        if user is not None:
+            return user
+        return (await self.get_aliased_users_by_ids(session, [user_id])).get(user_id)
 
     async def get_aliased_users_by_ids(
         self, session: AsyncSession, alias_ids: list[str]

@@ -121,12 +121,36 @@ los de `.env.example`, los del host.
 | `POST` | `/api/v1/users/bulk` | Perfiles públicos de hasta 100 usuarios (`{"user_ids": [...]}`). De una cuenta suspendida solo vuelve el nombre, con `is_suspended: true` (perfil no disponible) | `200`, `401`, `422` |
 | `PATCH` | `/api/v1/users/me/profile` | Edita `username`, `display_name`, `bio` o `custom_status` | `200`, `401`, `404`, `409`, `422` |
 | `PATCH` | `/api/v1/users/me/profile/avatar` | Sube el avatar (`multipart/form-data`, campo `file`; JPEG, PNG o WebP hasta 5 MB). Se guarda en S3 como WebP de 256×256 | `200`, `401`, `422` (formato o tamaño), `503` (sin S3) |
+| `GET` | `/api/v1/users/{user_id}/profile` | Perfil público con `relationship` (`none`, `friend`, `request_sent`, `request_received`, `blocked`). Nunca trae el email ni dice si el otro te bloqueó. Si la cuenta está suspendida o no existe, `404` | `200`, `401`, `404` |
+| `GET` | `/api/v1/users/me/friends` | Amigos. Un amigo suspendido solo muestra el nombre | `200`, `401` |
+| `DELETE` | `/api/v1/users/me/friends/{user_id}` | Saca la amistad. Idempotente | `204`, `401` |
+| `GET` | `/api/v1/users/me/friend-requests` | Solicitudes pendientes: `{ incoming, outgoing }` | `200`, `401` |
+| `POST` | `/api/v1/users/me/friend-requests` | Pide amistad con `target` (username o email) o `user_id`, y `message` opcional (hasta 190). Con una solicitud inversa pendiente quedan amigos. Por email o si hay un bloqueo responde `202 {"status": "sent"}`: no confirma nada de la otra cuenta | `201`, `202`, `401`, `404`, `409`, `422` |
+| `POST` | `/api/v1/users/me/friend-requests/{id}/accept` | Acepta una solicitud recibida: `{ friend }`. Repetirla responde lo mismo | `200`, `401`, `404` |
+| `POST` | `/api/v1/users/me/friend-requests/{id}/decline` | Rechaza una solicitud recibida. Se puede volver a pedir | `204`, `401`, `404` |
+| `DELETE` | `/api/v1/users/me/friend-requests/{id}` | Cancela una solicitud propia | `204`, `401`, `404` |
+| `GET` | `/api/v1/users/me/blocks` | Usuarios bloqueados por mí | `200`, `401` |
+| `PUT` | `/api/v1/users/me/blocks/{user_id}` | Bloquea. En la misma transacción borra la amistad y cancela las solicitudes pendientes de los dos lados. Idempotente | `204`, `401`, `404`, `422` (uno mismo) |
+| `DELETE` | `/api/v1/users/me/blocks/{user_id}` | Desbloquea. Solo deshace el bloqueo propio. Idempotente | `204`, `401` |
 | `POST` | `/api/v1/auth/password-reset` | **Pública.** Le pide a Auth0 el email de recupero. Responde igual exista o no la cuenta; hasta 3 pedidos por email cada 15 min ([ADR-006](docs/ADR-006-Recupero-de-Contrasena.md)) | `202`, `422`, `429`, `503` |
 | `POST` | `/api/v1/admin/users/suspensions` | **Solo staff.** Suspende una cuenta (`{"user": "email, @usuario o id", "reason": "..."}`): la bloquea en Auth0, la agrega a la lista de bloqueados del Gateway y publica `user.suspended` ([ADR-002](docs/ADR-002-Suspension-Usuarios.md)) | `201`, `400` (la propia), `401`, `403`, `404`, `409` (ya suspendida), `422`, `503` |
 | `DELETE` | `/api/v1/admin/users/{user_id}/suspension` | **Solo staff.** Reactiva la cuenta y publica `user.reactivated` | `200`, `401`, `403`, `404`, `409` (no estaba suspendida), `503` |
 | `GET` | `/api/v1/admin/users/suspended` | **Solo staff.** Cuentas suspendidas, la más reciente primero | `200`, `401`, `403` |
 | `GET` | `/livez` | El proceso está vivo, sin I/O | `200` |
 | `GET` | `/readyz` | Llega a la base. Ante una falla no muestra el detalle, que queda en el log | `200`, `503` |
+
+Con login federado, `X-User-Id` y cualquier `{user_id}` pueden ser un alias: se resuelven al id canónico, que
+es el único que se guarda en `friendships`, `friend_requests` y `user_blocks`.
+
+### Endpoints internos
+
+Los consulta Chat desde el nodo realtime. No cuelgan de `/api/v1`, así que Kong no los expone, y no piden
+identidad de usuario: se limitan por red.
+
+| Método | Path | Descripción | Respuestas |
+|--------|------|-------------|------------|
+| `GET` | `/internal/users/{id}/canonical` | Resuelve un alias: `{ user_id, suspended }` | `200`, `404`, también si el alias todavía no se vinculó |
+| `GET` | `/internal/relations?actor={id}&other={id}` | `{ exists, suspended, friends, blocked_by_actor, blocked_by_other }`. `suspended` habla de `other`. Si alguno de los dos no existe, todo viene en `false` | `200`, `422` |
 
 El contrato completo (OpenAPI) lo genera FastAPI: `http://localhost:8004/docs` y `/openapi.json`.
 
@@ -183,10 +207,11 @@ alembic downgrade -1                                   # deshacer la última
 ```text
 app/
 ├── main.py            app de FastAPI, /livez y /readyz
-├── api/v1/            rutas (users, profile, password_reset) y dependencias de identidad
+├── api/v1/            rutas (users, profile, social, password_reset) y dependencias de identidad
+├── api/internal.py    rutas internas para otros servicios, fuera de Kong
 ├── services/          lógica de negocio, validación de imágenes y S3
 ├── repositories/      acceso a datos
-├── models/            modelos de SQLAlchemy (users, user_profiles, outbox_events, ...)
+├── models/            modelos de SQLAlchemy (users, user_profiles, friendships, outbox_events, ...)
 ├── schemas/           modelos de Pydantic y Problem Details
 ├── clients/auth0.py   Authentication API de Auth0 (recupero de contraseña)
 ├── workers/           publicador del outbox

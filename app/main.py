@@ -6,6 +6,7 @@ from sqlalchemy import text
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.api import internal
 from app.api.v1 import api_router
 from app.core.exceptions import register_exception_handlers
 from app.core.logger import get_logger, setup_logging
@@ -29,6 +30,7 @@ app = FastAPI(
 
 register_exception_handlers(app)
 app.include_router(api_router, prefix="/api/v1")
+app.include_router(internal.router)
 
 
 @app.get("/", tags=["Root"])

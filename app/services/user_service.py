@@ -148,17 +148,17 @@ class UserService:
         """Retrieves profiles for a list of user IDs, including linked federated aliases."""
         users = await self.user_repo.get_users_by_ids(session, user_ids)
         found_ids = {user.id for user in users}
-        responses = [_public_profile(user, user.id) for user in users if user.profile is not None]
+        responses = [public_profile_view(user, user.id) for user in users if user.profile is not None]
         missing_ids = [uid for uid in user_ids if uid not in found_ids]
         if missing_ids:
             aliased = await self.user_repo.get_aliased_users_by_ids(session, missing_ids)
             responses.extend(
-                _public_profile(user, alias_id) for alias_id, user in aliased.items() if user.profile is not None
+                public_profile_view(user, alias_id) for alias_id, user in aliased.items() if user.profile is not None
             )
         return responses
 
 
-def _public_profile(user: User, response_user_id: str) -> UserProfileResponse:
+def public_profile_view(user: User, response_user_id: str) -> UserProfileResponse:
     """What other users see. A suspended account keeps its name (old messages still show who wrote them),
     but its profile is not available: no avatar, bio nor status (Suspender usuario, CA 1)."""
     profile = user.profile

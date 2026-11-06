@@ -100,6 +100,33 @@ class UserProfileNotFoundError(NotFoundError):
         super().__init__(detail)
 
 
+class ProfileNotAvailableError(NotFoundError):
+    """Unknown or suspended: the two look the same on purpose."""
+
+    def __init__(self, detail: str = "Profile not available."):
+        super().__init__(detail)
+
+
+class FriendRequestNotFoundError(NotFoundError):
+    def __init__(self, detail: str = "Friend request not found."):
+        super().__init__(detail)
+
+
+class AlreadyFriendsError(ConflictError):
+    def __init__(self, detail: str = "You are already friends with this user."):
+        super().__init__(detail)
+
+
+class FriendRequestAlreadyPendingError(ConflictError):
+    def __init__(self, detail: str = "A friend request to this user is already pending."):
+        super().__init__(detail)
+
+
+class SelfRelationError(UnprocessableEntityError):
+    def __init__(self, detail: str = "This action cannot target your own account."):
+        super().__init__(detail)
+
+
 class PasswordResetThrottledError(AppException):
     """Too many reset requests for one email. Applies to any email, so it does not reveal registration."""
 
@@ -179,14 +206,19 @@ class AvatarUploadError(AppException):
 __all__ = [
     "PROBLEM_TYPE_BASE",
     "AccountSuspendedError",
+    "AlreadyFriendsError",
     "AppException",
     "BadRequestError",
     "ConflictError",
     "EmailNotVerifiedError",
     "ForbiddenError",
+    "FriendRequestAlreadyPendingError",
+    "FriendRequestNotFoundError",
     "IdentityProviderUnavailableError",
     "NotFoundError",
     "PasswordResetThrottledError",
+    "ProfileNotAvailableError",
+    "SelfRelationError",
     "StaffOnlyError",
     "StorageUnavailableError",
     "SuspensionDenylistUnavailableError",

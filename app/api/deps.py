@@ -6,8 +6,9 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.session import get_db
-from app.exceptions import StaffOnlyError, UnauthorizedError
+from app.exceptions import AccountSuspendedError, StaffOnlyError, UnauthorizedError, UserProfileNotFoundError
 from app.models.user import User
+from app.repositories.user_repository import UserRepository
 
 PLATFORM_STAFF_ROLE = "staff"
 
@@ -78,7 +79,26 @@ async def get_current_user_id(
     return identity.user_id
 
 
+async def get_current_user(
+    identity: Annotated[AuthenticatedIdentity, Depends(get_authenticated_identity)],
+    db: Annotated[AsyncSession, Depends(get_db)],
+) -> User:
+    """The canonical user behind X-User-Id, which with federated login can be an alias of it."""
+    user_repo = UserRepository()
+    user = await user_repo.resolve_canonical_user(db, identity.user_id)
+    if user is None and identity.email and identity.email_verified:
+        user = await user_repo.get_user_by_email(db, identity.email)
+        if user is not None:
+            await user_repo.ensure_identity_alias(db, identity.user_id, user.id)
+    if user is None or user.profile is None:
+        raise UserProfileNotFoundError()
+    if user.is_suspended:
+        raise AccountSuspendedError()
+    return user
+
+
 DbSession = Annotated[AsyncSession, Depends(get_db)]
 CurrentIdentity = Annotated[AuthenticatedIdentity, Depends(get_authenticated_identity)]
 CurrentUserId = Annotated[str, Depends(get_current_user_id)]
+CurrentUser = Annotated[User, Depends(get_current_user)]
 StaffIdentity = Annotated[AuthenticatedIdentity, Depends(require_staff)]
