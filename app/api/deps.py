@@ -48,8 +48,15 @@ async def get_authenticated_identity(
         user_id=x_user_id,
         email=x_user_email,
         email_verified=_parse_bool_header(x_user_email_verified),
-        role=(x_user_role or "user").strip(),
+        role=_parse_role_header(x_user_role),
     )
+
+
+def _parse_role_header(value: object) -> str:
+    """Missing, empty or not a string (e.g. the Header() default when called outside FastAPI) means "user"."""
+    if isinstance(value, str) and value.strip():
+        return value.strip()
+    return "user"
 
 
 async def require_staff(
