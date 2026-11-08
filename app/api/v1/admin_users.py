@@ -1,6 +1,6 @@
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, status
+from fastapi import APIRouter, Depends, Query, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import StaffIdentity, get_current_user_id
@@ -8,8 +8,9 @@ from app.clients.auth0_management import get_auth0_management_client
 from app.clients.suspension_denylist import get_suspension_denylist
 from app.db.session import get_db
 from app.schemas.problem import ProblemDetails
-from app.schemas.suspension import PlatformUserSummary, SuspendUserRequest
+from app.schemas.suspension import AccountStateFilter, PlatformUserPage, PlatformUserSummary, SuspendUserRequest
 from app.services.suspension_service import SuspensionService
+from app.services.user_directory_service import UserDirectoryService
 
 # Endpoints del backoffice (solo staff). Kong exige validate("staff") en /api/v1/admin/users y acá se vuelve a
 # chequear el rol con StaffIdentity (Gateway ADR-002, reglas 1 y 2).
@@ -27,6 +28,29 @@ def get_suspension_service() -> SuspensionService:
 
 Service = Annotated[SuspensionService, Depends(get_suspension_service)]
 Db = Annotated[AsyncSession, Depends(get_db)]
+directory_service = UserDirectoryService()
+
+
+@router.get(
+    "",
+    status_code=status.HTTP_200_OK,
+    response_model=PlatformUserPage,
+    summary="List platform accounts with filters",
+    description=(
+        "Staff directory. `q` matches email, username (with or without @) or display name, partially and "
+        "case-insensitive. `state` filters by active or suspended. Newest accounts first."
+    ),
+    responses={**STAFF_ERRORS, status.HTTP_422_UNPROCESSABLE_ENTITY: {"model": ProblemDetails}},
+)
+async def list_users(
+    _staff: StaffIdentity,
+    db: Db,
+    q: Annotated[str | None, Query(max_length=100, description="Email, @username or display name")] = None,
+    state: Annotated[AccountStateFilter, Query(description="all, active or suspended")] = "all",
+    page: Annotated[int, Query(ge=1)] = 1,
+    page_size: Annotated[int, Query(ge=1, le=100)] = 25,
+) -> PlatformUserPage:
+    return await directory_service.search(db, q, state, page, page_size)
 
 
 @router.post(

@@ -1,7 +1,7 @@
 from datetime import UTC, datetime
 from typing import Any
 
-from sqlalchemy import func, select
+from sqlalchemy import func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.outbox import OutboxEvent
@@ -117,6 +117,39 @@ class UserRepository:
             for ev in events
             if isinstance(ev.payload, dict) and ev.payload.get("primary_user_id") == primary_user_id
         ]
+
+    async def search_users(
+        self,
+        session: AsyncSession,
+        query: str | None,
+        state: str,
+        limit: int,
+        offset: int,
+    ) -> tuple[list[User], int]:
+        """Staff directory: accounts matching `query` (email, username or display name, case-insensitive, partial)
+        and `state` ("all", "active" or "suspended"), newest first. Returns the page and the total count."""
+        stmt = select(User).outerjoin(UserProfile, UserProfile.user_id == User.id)
+
+        text = (query or "").strip().lstrip("@").lower()
+        if text:
+            # % y _ es hacer un LIKE: se escapan para que busquen el carácter literal
+            escaped = text.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+            pattern = f"%{escaped}%"
+            stmt = stmt.where(
+                or_(
+                    func.lower(User.email).like(pattern, escape="\\"),
+                    func.lower(UserProfile.username).like(pattern, escape="\\"),
+                    func.lower(UserProfile.display_name).like(pattern, escape="\\"),
+                )
+            )
+        if state == "active":
+            stmt = stmt.where(User.is_suspended.is_(False))
+        elif state == "suspended":
+            stmt = stmt.where(User.is_suspended.is_(True))
+
+        total = await session.scalar(select(func.count()).select_from(stmt.subquery()))
+        page = await session.execute(stmt.order_by(User.created_at.desc(), User.id).limit(limit).offset(offset))
+        return list(page.scalars().all()), int(total or 0)
 
     async def list_suspended_users(self, session: AsyncSession) -> list[User]:
         """Suspended accounts, most recent first."""

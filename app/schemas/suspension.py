@@ -1,4 +1,5 @@
 from datetime import datetime
+from typing import Literal
 
 from pydantic import BaseModel, Field
 
@@ -33,3 +34,15 @@ class PlatformUserSummary(BaseModel):
     suspended_by: str | None = None
     suspension_reason: str | None = None
     created_at: datetime
+
+
+AccountStateFilter = Literal["all", "active", "suspended"]
+
+
+class PlatformUserPage(BaseModel):
+    """A page of the staff user directory ("Ver listado de usuarios con filtros")."""
+
+    items: list[PlatformUserSummary]
+    total: int = Field(..., description="Accounts matching the filters, across all pages")
+    page: int
+    page_size: int
