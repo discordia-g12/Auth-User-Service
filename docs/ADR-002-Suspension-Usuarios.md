@@ -75,6 +75,30 @@ La reactivación hace lo inverso.
 - Kong suma una lectura de Redis por request autenticado. El Redis ya existe para rate limiting.
 - Chat Engine y Voice Signaling deben consumir `user.suspended`.
 
+### Riesgo conocido: la lista de suspendidos no sobrevive a un reinicio de Redis
+
+El Redis del Gateway no guarda nada en disco (es un caché: contadores de rate limiting y esta lista). La fuente
+de verdad de las suspensiones es la base de este servicio (`users.is_suspended`). Si `gateway-redis` se reinicia
+o se recrea (un deploy del orquestador que lo cambie, o una caída del nodo edge), se pierden las claves
+`suspended:*` y Kong deja de rechazar los access tokens **ya emitidos** de las cuentas suspendidas, hasta que
+vencen (24 h con la configuración actual de Auth0).
+
+Mientras tanto, la cuenta suspendida sigue sin poder usar Discordia en la práctica:
+
+- Auth0 la tiene bloqueada: no obtiene tokens nuevos (ni por login ni por renovación silenciosa).
+- `GET /api/v1/users/me` le responde `403 account-suspended`, y los clientes muestran la pantalla de cuenta
+  suspendida al arrancar o recargar.
+- Sus WebSockets ya se cerraron con `user.suspended`, y Voz conserva su propia marca (`voice:suspended:<id>`).
+
+Lo que queda abierto es el uso directo de la API con un token vigente: otros servicios (Server-Roles, Chat REST)
+no consultan la suspensión. Opciones para cerrarlo, sin decidir todavía:
+
+| Opción | Cómo | A favor | En contra |
+|---|---|---|---|
+| **Recargar la lista desde la base** (preferida) | Auth-User vuelve a escribir las claves de todas las cuentas suspendidas al arrancar y cada pocos minutos (por ejemplo, en el worker del outbox) | La base sigue siendo la fuente de verdad; no cambia el Redis; también repara claves descartadas por evicción | Tras un reinicio de Redis queda una ventana de hasta el intervalo elegido |
+| Persistencia en disco del Redis del Gateway (AOF) | `appendonly yes` y un volumen en `gateway-redis` | Las claves sobreviven a reinicios | Suma escritura en disco y un volumen en el nodo edge para datos que ya están en la base; los contadores de rate limiting no lo necesitan |
+| Acortar la vida del access token | Configurar 5–15 min en la API de Auth0 | Achica la ventana para cualquier caso, no solo este | Más renovaciones de token; ya está pendiente por otros motivos |
+
 ## 5. Estado de implementación
 
 | Pieza | Estado |
@@ -87,3 +111,4 @@ La reactivación hace lo inverso.
 | Evento `user.suspended` / `user.reactivated` | Publicado por el Outbox (ADR-005) |
 | Consumidores en Chat Engine y Voice Signaling | En sus repos |
 | Vida del access token en Auth0 | Pendiente de acortar (5–15 min); hoy se asume el valor por defecto, 24 h |
+| Lista de suspendidos tras un reinicio de Redis (§4, riesgo conocido) | Pendiente de decidir; preferida: recargarla desde la base |
