@@ -8,4 +8,4 @@ aiosqlite==0.22.1
 
 # Lint y SAST
 ruff==0.17.4
-bandit>=1.7
+bandit>=1.9.4
