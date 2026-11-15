@@ -21,6 +21,10 @@ class User(Base):
     email: Mapped[str] = mapped_column(String(255), unique=True, index=True, nullable=False)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
     is_suspended: Mapped[bool] = mapped_column(Boolean, default=False)
+    # Suspensión a nivel plataforma (ADR-002): cuándo, quién del staff y por qué. Vacíos si no está suspendida
+    suspended_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True, default=None)
+    suspended_by: Mapped[str | None] = mapped_column(String, nullable=True, default=None)
+    suspension_reason: Mapped[str | None] = mapped_column(String(512), nullable=True, default=None)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
     profile: Mapped["UserProfile"] = relationship(

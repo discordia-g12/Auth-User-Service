@@ -2,7 +2,14 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.logger import get_logger
-from app.exceptions import ConflictError, UserAlreadyExistsError, UsernameConflictError, UserProfileNotFoundError
+from app.exceptions import (
+    AccountSuspendedError,
+    ConflictError,
+    UserAlreadyExistsError,
+    UsernameConflictError,
+    UserProfileNotFoundError,
+)
+from app.models.user import User
 from app.repositories.user_repository import UserRepository
 from app.schemas.user import CreateUserProfileRequest, ResolveIdentityResponse, UserProfileResponse
 from app.services.validation import no_null_bytes
@@ -100,6 +107,9 @@ class UserService:
         if user is None or user.profile is None:
             logger.warning("user_profile_not_found", user_id=user_id)
             raise UserProfileNotFoundError()
+        if user.is_suspended:
+            # Kong ya rechaza sus tokens (lista de bloqueados): esto cubre una identidad nueva sin bloquear
+            raise AccountSuspendedError()
 
         profile = user.profile
         return UserProfileResponse(
@@ -138,34 +148,36 @@ class UserService:
         """Retrieves profiles for a list of user IDs, including linked federated aliases."""
         users = await self.user_repo.get_users_by_ids(session, user_ids)
         found_ids = {user.id for user in users}
-        responses = []
-        for user in users:
-            if user.profile is not None:
-                profile = user.profile
-                responses.append(UserProfileResponse(
-                    user_id=user.id,
-                    username=profile.username,
-                    display_name=profile.display_name,
-                    avatar_url=profile.avatar_url,
-                    bio=profile.bio,
-                    activity_status=profile.activity_status,
-                    custom_status=profile.custom_status,
-                    created_at=user.created_at,
-                ))
+        responses = [public_profile_view(user, user.id) for user in users if user.profile is not None]
         missing_ids = [uid for uid in user_ids if uid not in found_ids]
         if missing_ids:
             aliased = await self.user_repo.get_aliased_users_by_ids(session, missing_ids)
-            for alias_id, user in aliased.items():
-                if user.profile is not None:
-                    profile = user.profile
-                    responses.append(UserProfileResponse(
-                        user_id=alias_id,
-                        username=profile.username,
-                        display_name=profile.display_name,
-                        avatar_url=profile.avatar_url,
-                        bio=profile.bio,
-                        activity_status=profile.activity_status,
-                        custom_status=profile.custom_status,
-                        created_at=user.created_at,
-                    ))
+            responses.extend(
+                public_profile_view(user, alias_id) for alias_id, user in aliased.items() if user.profile is not None
+            )
         return responses
+
+
+def public_profile_view(user: User, response_user_id: str) -> UserProfileResponse:
+    """What other users see. A suspended account keeps its name (old messages still show who wrote them),
+    but its profile is not available: no avatar, bio nor status (Suspender usuario, CA 1)."""
+    profile = user.profile
+    if user.is_suspended:
+        return UserProfileResponse(
+            user_id=response_user_id,
+            username=profile.username,
+            display_name=profile.display_name,
+            activity_status="offline",
+            created_at=user.created_at,
+            is_suspended=True,
+        )
+    return UserProfileResponse(
+        user_id=response_user_id,
+        username=profile.username,
+        display_name=profile.display_name,
+        avatar_url=profile.avatar_url,
+        bio=profile.bio,
+        activity_status=profile.activity_status,
+        custom_status=profile.custom_status,
+        created_at=user.created_at,
+    )

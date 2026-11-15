@@ -1,7 +1,7 @@
 from datetime import UTC, datetime
 from typing import Any
 
-from sqlalchemy import select
+from sqlalchemy import func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.outbox import OutboxEvent
@@ -21,6 +21,21 @@ class UserRepository:
         stmt = select(User).where(User.email == email)
         result = await session.execute(stmt)
         return result.scalar_one_or_none()
+
+    async def find_user_by_email(self, session: AsyncSession, email: str) -> User | None:
+        """Case-insensitive lookup. `users.email` is only unique as written, so it never expects a single row."""
+        stmt = select(User).where(func.lower(User.email) == email.lower()).order_by(User.id)
+        return (await session.execute(stmt)).scalars().first()
+
+    async def find_user_by_username(self, session: AsyncSession, username: str) -> User | None:
+        """Case-insensitive lookup. `username` is only unique as written: an exact match wins over the others."""
+        stmt = (
+            select(User)
+            .join(UserProfile, UserProfile.user_id == User.id)
+            .where(func.lower(UserProfile.username) == username.lower())
+            .order_by((UserProfile.username == username).desc(), UserProfile.username)
+        )
+        return (await session.execute(stmt)).scalars().first()
 
     async def get_profile_by_username(self, session: AsyncSession, username: str) -> UserProfile | None:
         """Retrieves a user profile by username to check uniqueness."""
@@ -74,6 +89,79 @@ class UserRepository:
         return user, profile
 
 
+    async def find_user_by_identifier(self, session: AsyncSession, identifier: str) -> User | None:
+        """Staff lookup: "@username", an email (case-insensitive), a user id or a bare username."""
+        value = identifier.strip()
+        if not value:
+            return None
+        if value.startswith("@"):
+            return await self._get_user_by_username(session, value[1:])
+        if "@" in value:
+            stmt = select(User).where(func.lower(User.email) == value.lower())
+            return (await session.execute(stmt)).scalar_one_or_none()
+        user = await self.get_user_by_id(session, value)
+        if user is not None:
+            return user
+        return await self._get_user_by_username(session, value)
+
+    async def _get_user_by_username(self, session: AsyncSession, username: str) -> User | None:
+        stmt = select(User).join(UserProfile, UserProfile.user_id == User.id).where(UserProfile.username == username)
+        return (await session.execute(stmt)).scalar_one_or_none()
+
+    async def get_alias_ids(self, session: AsyncSession, primary_user_id: str) -> list[str]:
+        """Federated identities linked to a user (see ensure_identity_alias)."""
+        stmt = select(OutboxEvent).where(OutboxEvent.aggregate_type == "user_identity_alias")
+        events = (await session.execute(stmt)).scalars().all()
+        return [
+            ev.aggregate_id
+            for ev in events
+            if isinstance(ev.payload, dict) and ev.payload.get("primary_user_id") == primary_user_id
+        ]
+
+    async def search_users(
+        self,
+        session: AsyncSession,
+        query: str | None,
+        state: str,
+        limit: int,
+        offset: int,
+    ) -> tuple[list[User], int]:
+        """Staff directory: accounts matching `query` (email, username or display name, case-insensitive, partial)
+        and `state` ("all", "active" or "suspended"), newest first. Returns the page and the total count."""
+        stmt = select(User).outerjoin(UserProfile, UserProfile.user_id == User.id)
+
+        text = (query or "").strip().lstrip("@").lower()
+        if text:
+            # % y _ es hacer un LIKE: se escapan para que busquen el carácter literal
+            escaped = text.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+            pattern = f"%{escaped}%"
+            stmt = stmt.where(
+                or_(
+                    func.lower(User.email).like(pattern, escape="\\"),
+                    func.lower(UserProfile.username).like(pattern, escape="\\"),
+                    func.lower(UserProfile.display_name).like(pattern, escape="\\"),
+                )
+            )
+        if state == "active":
+            stmt = stmt.where(User.is_suspended.is_(False))
+        elif state == "suspended":
+            stmt = stmt.where(User.is_suspended.is_(True))
+
+        total = await session.scalar(select(func.count()).select_from(stmt.subquery()))
+        page = await session.execute(stmt.order_by(User.created_at.desc(), User.id).limit(limit).offset(offset))
+        return list(page.scalars().all()), int(total or 0)
+
+    async def list_suspended_users(self, session: AsyncSession) -> list[User]:
+        """Suspended accounts, most recent first."""
+        stmt = select(User).where(User.is_suspended.is_(True)).order_by(User.suspended_at.desc())
+        return list((await session.execute(stmt)).scalars().all())
+
+    def add_outbox_event(
+        self, session: AsyncSession, user_id: str, event_type: str, payload: dict[str, Any]
+    ) -> None:
+        """Queues a domain event in the same transaction as the change (ADR-005)."""
+        session.add(OutboxEvent(aggregate_type="user", aggregate_id=user_id, event_type=event_type, payload=payload))
+
     async def get_users_by_ids(self, session: AsyncSession, user_ids: list[str]) -> list[User]:
         """Retrieves multiple users by their IDs."""
         stmt = select(User).where(User.id.in_(user_ids))
@@ -102,6 +190,15 @@ class UserRepository:
                 )
             )
             await session.commit()
+
+    async def resolve_canonical_user(self, session: AsyncSession, user_id: str) -> User | None:
+        """The user behind an id that can be canonical or a federated alias. None if it is neither."""
+        if "\x00" in user_id:
+            return None
+        user = await self.get_user_by_id(session, user_id)
+        if user is not None:
+            return user
+        return (await self.get_aliased_users_by_ids(session, [user_id])).get(user_id)
 
     async def get_aliased_users_by_ids(
         self, session: AsyncSession, alias_ids: list[str]

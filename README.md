@@ -103,6 +103,9 @@ los de `.env.example`, los del host.
 | `AUTH0_CLIENT_ID` | — | `client_id` público de la app de Auth0 (el mismo que usan web y mobile) |
 | `AUTH0_DB_CONNECTION` | `Username-Password-Authentication` | Conexión de base de datos de Auth0 |
 | `AUTH0_TIMEOUT_SECONDS` | `5.0` | Timeout de las llamadas a Auth0 |
+| `AUTH0_MGMT_CLIENT_ID` / `AUTH0_MGMT_CLIENT_SECRET` | — | Aplicación *Machine to Machine* de Auth0 con `read:users` y `update:users` sobre la Management API. Bloquea y desbloquea cuentas al suspender. Sin ellas, suspender responde `503`. El secret no se commitea |
+| `GATEWAY_REDIS_HOST` / `GATEWAY_REDIS_PORT` | `gateway-redis` / `6379` | Redis del Gateway, donde va la lista de cuentas suspendidas que consulta Kong |
+| `SUSPENSION_DENYLIST_TTL_SECONDS` | `86400` | Vida máxima del access token en Auth0. Tiene que coincidir con el valor configurado en la API de Auth0 |
 | `PASSWORD_RESET_MAX_REQUESTS` / `PASSWORD_RESET_WINDOW_SECONDS` | `3` / `900` | Límite de pedidos de recupero por email |
 | `AWS_REGION` | `us-east-1` | Región del bucket |
 | `S3_BUCKET` | — | Bucket de avatares. Sin bucket o sin claves, la subida responde `503` y el resto funciona |
@@ -114,13 +117,41 @@ los de `.env.example`, los del host.
 | Método | Path | Descripción | Respuestas |
 |--------|------|-------------|------------|
 | `POST` | `/api/v1/users/me` | Crea el usuario y su perfil para la identidad autenticada | `201`, `400`, `401`, `403`, `409`, `422` |
-| `GET` | `/api/v1/users/me` | Perfil propio. El `404` le indica al cliente que falta crear el perfil (onboarding) | `200`, `401`, `404` |
-| `POST` | `/api/v1/users/bulk` | Perfiles públicos de hasta 100 usuarios (`{"user_ids": [...]}`) | `200`, `401`, `422` |
+| `GET` | `/api/v1/users/me` | Perfil propio. El `404` le indica al cliente que falta crear el perfil (onboarding). Una cuenta suspendida recibe `403` (`account-suspended`) | `200`, `401`, `403`, `404` |
+| `POST` | `/api/v1/users/bulk` | Perfiles públicos de hasta 100 usuarios (`{"user_ids": [...]}`). De una cuenta suspendida solo vuelve el nombre, con `is_suspended: true` (perfil no disponible) | `200`, `401`, `422` |
 | `PATCH` | `/api/v1/users/me/profile` | Edita `username`, `display_name`, `bio` o `custom_status` | `200`, `401`, `404`, `409`, `422` |
 | `PATCH` | `/api/v1/users/me/profile/avatar` | Sube el avatar (`multipart/form-data`, campo `file`; JPEG, PNG o WebP hasta 5 MB). Se guarda en S3 como WebP de 256×256 | `200`, `401`, `422` (formato o tamaño), `503` (sin S3) |
+| `GET` | `/api/v1/users/{user_id}/profile` | Perfil público con `relationship` (`none`, `friend`, `request_sent`, `request_received`, `blocked`). Nunca trae el email ni dice si el otro te bloqueó. Si la cuenta está suspendida o no existe, `404` | `200`, `401`, `404` |
+| `GET` | `/api/v1/users/me/friends` | Amigos. Un amigo suspendido solo muestra el nombre | `200`, `401` |
+| `DELETE` | `/api/v1/users/me/friends/{user_id}` | Saca la amistad. Idempotente | `204`, `401` |
+| `GET` | `/api/v1/users/me/friend-requests` | Solicitudes pendientes: `{ incoming, outgoing }` | `200`, `401` |
+| `POST` | `/api/v1/users/me/friend-requests` | Pide amistad con `target` (username o email) o `user_id`, y `message` opcional (hasta 190). Con una solicitud inversa pendiente quedan amigos. Por email o si hay un bloqueo responde `202 {"status": "sent"}`: no confirma nada de la otra cuenta | `201`, `202`, `401`, `404`, `409`, `422` |
+| `POST` | `/api/v1/users/me/friend-requests/{id}/accept` | Acepta una solicitud recibida: `{ friend }`. Repetirla responde lo mismo | `200`, `401`, `404` |
+| `POST` | `/api/v1/users/me/friend-requests/{id}/decline` | Rechaza una solicitud recibida. Se puede volver a pedir | `204`, `401`, `404` |
+| `DELETE` | `/api/v1/users/me/friend-requests/{id}` | Cancela una solicitud propia | `204`, `401`, `404` |
+| `GET` | `/api/v1/users/me/blocks` | Usuarios bloqueados por mí | `200`, `401` |
+| `PUT` | `/api/v1/users/me/blocks/{user_id}` | Bloquea. En la misma transacción borra la amistad y cancela las solicitudes pendientes de los dos lados. Idempotente | `204`, `401`, `404`, `422` (uno mismo) |
+| `DELETE` | `/api/v1/users/me/blocks/{user_id}` | Desbloquea. Solo deshace el bloqueo propio. Idempotente | `204`, `401` |
 | `POST` | `/api/v1/auth/password-reset` | **Pública.** Le pide a Auth0 el email de recupero. Responde igual exista o no la cuenta; hasta 3 pedidos por email cada 15 min ([ADR-006](docs/ADR-006-Recupero-de-Contrasena.md)) | `202`, `422`, `429`, `503` |
+| `GET` | `/api/v1/admin/users?q=&state=&page=&page_size=` | **Solo staff.** Listado de cuentas: `q` busca por email, @usuario o nombre (parcial, sin distinguir mayúsculas); `state` es `all`, `active` o `suspended`. Paginado (`page_size` hasta 100), la más nueva primero. Devuelve `{items, total, page, page_size}` | `200`, `401`, `403`, `422` |
+| `POST` | `/api/v1/admin/users/suspensions` | **Solo staff.** Suspende una cuenta (`{"user": "email, @usuario o id", "reason": "..."}`): la bloquea en Auth0, la agrega a la lista de bloqueados del Gateway y publica `user.suspended` ([ADR-002](docs/ADR-002-Suspension-Usuarios.md)) | `201`, `400` (la propia), `401`, `403`, `404`, `409` (ya suspendida), `422`, `503` |
+| `DELETE` | `/api/v1/admin/users/{user_id}/suspension` | **Solo staff.** Reactiva la cuenta y publica `user.reactivated` | `200`, `401`, `403`, `404`, `409` (no estaba suspendida), `503` |
+| `GET` | `/api/v1/admin/users/suspended` | **Solo staff.** Cuentas suspendidas, la más reciente primero | `200`, `401`, `403` |
 | `GET` | `/livez` | El proceso está vivo, sin I/O | `200` |
 | `GET` | `/readyz` | Llega a la base. Ante una falla no muestra el detalle, que queda en el log | `200`, `503` |
+
+Con login federado, `X-User-Id` y cualquier `{user_id}` pueden ser un alias: se resuelven al id canónico, que
+es el único que se guarda en `friendships`, `friend_requests` y `user_blocks`.
+
+### Endpoints internos
+
+Los consulta Chat desde el nodo realtime. No cuelgan de `/api/v1`, así que Kong no los expone, y no piden
+identidad de usuario: se limitan por red.
+
+| Método | Path | Descripción | Respuestas |
+|--------|------|-------------|------------|
+| `GET` | `/internal/users/{id}/canonical` | Resuelve un alias: `{ user_id, suspended }` | `200`, `404`, también si el alias todavía no se vinculó |
+| `GET` | `/internal/relations?actor={id}&other={id}` | `{ exists, suspended, friends, blocked_by_actor, blocked_by_other }`. `suspended` habla de `other`. Si alguno de los dos no existe, todo viene en `false` | `200`, `422` |
 
 El contrato completo (OpenAPI) lo genera FastAPI: `http://localhost:8004/docs` y `/openapi.json`.
 
@@ -129,6 +160,8 @@ Los errores siguen RFC 7807 (`application/problem+json`). Los clientes solo debe
 
 - `https://discordia.app/problems/email-not-verified` (403)
 - `https://discordia.app/problems/password-reset-throttled` (429, con `Retry-After`)
+- `https://discordia.app/problems/account-suspended` (403): la cuenta está suspendida por la plataforma
+- `https://discordia.app/problems/staff-only` (403): el endpoint es solo para el staff
 
 ### Headers de identidad (los agrega Kong)
 
@@ -137,7 +170,7 @@ Los errores siguen RFC 7807 (`application/problem+json`). Los clientes solo debe
 | `X-User-Id` | Obligatorio. Es el `sub` de Auth0, un identificador opaco (`401` si falta) |
 | `X-User-Email` | Obligatorio para `POST /me` (`400` si falta) |
 | `X-User-Email-Verified` | Para `POST /me` solo se acepta `true` (sin distinguir mayúsculas). Cualquier otro valor da `403` |
-| `X-User-Role` | No se usa: la autorización por rol la hace el Gateway |
+| `X-User-Role` | Los endpoints `/admin/*` exigen exactamente `staff` (`403` si no). Es la segunda barrera: la primera es `validate("staff")` en Kong |
 
 ### Eventos que publica
 
@@ -145,6 +178,8 @@ Los errores siguen RFC 7807 (`application/problem+json`). Los clientes solo debe
 |---|---|
 | `user.registered` | Al crear el perfil (`POST /users/me`) |
 | `user.profile.updated` | Al editar el perfil o el avatar |
+| `user.suspended` | Al suspender una cuenta. Trae `user_id`, `identities` (el id y sus identidades federadas), `reason`, `suspended_by` y `suspended_at`. Chat y Voz cierran las conexiones de esas identidades |
+| `user.reactivated` | Al reactivarla |
 
 ## Tests, lint y seguridad
 
@@ -173,10 +208,11 @@ alembic downgrade -1                                   # deshacer la última
 ```text
 app/
 ├── main.py            app de FastAPI, /livez y /readyz
-├── api/v1/            rutas (users, profile, password_reset) y dependencias de identidad
+├── api/v1/            rutas (users, profile, social, password_reset) y dependencias de identidad
+├── api/internal.py    rutas internas para otros servicios, fuera de Kong
 ├── services/          lógica de negocio, validación de imágenes y S3
 ├── repositories/      acceso a datos
-├── models/            modelos de SQLAlchemy (users, user_profiles, outbox_events, ...)
+├── models/            modelos de SQLAlchemy (users, user_profiles, friendships, outbox_events, ...)
 ├── schemas/           modelos de Pydantic y Problem Details
 ├── clients/auth0.py   Authentication API de Auth0 (recupero de contraseña)
 ├── workers/           publicador del outbox

@@ -100,6 +100,33 @@ class UserProfileNotFoundError(NotFoundError):
         super().__init__(detail)
 
 
+class ProfileNotAvailableError(NotFoundError):
+    """Unknown or suspended: the two look the same on purpose."""
+
+    def __init__(self, detail: str = "Profile not available."):
+        super().__init__(detail)
+
+
+class FriendRequestNotFoundError(NotFoundError):
+    def __init__(self, detail: str = "Friend request not found."):
+        super().__init__(detail)
+
+
+class AlreadyFriendsError(ConflictError):
+    def __init__(self, detail: str = "You are already friends with this user."):
+        super().__init__(detail)
+
+
+class FriendRequestAlreadyPendingError(ConflictError):
+    def __init__(self, detail: str = "A friend request to this user is already pending."):
+        super().__init__(detail)
+
+
+class SelfRelationError(UnprocessableEntityError):
+    def __init__(self, detail: str = "This action cannot target your own account."):
+        super().__init__(detail)
+
+
 class PasswordResetThrottledError(AppException):
     """Too many reset requests for one email. Applies to any email, so it does not reveal registration."""
 
@@ -122,6 +149,34 @@ class IdentityProviderUnavailableError(AppException):
     title = "Service Unavailable"
 
     def __init__(self, detail: str = "The request could not be processed right now. Try again later."):
+        super().__init__(detail)
+
+
+class StaffOnlyError(ForbiddenError):
+    """Second barrier for staff endpoints. The first one is validate("staff") in Kong (Gateway ADR-002)."""
+
+    type = f"{PROBLEM_TYPE_BASE}/staff-only"
+
+    def __init__(self, detail: str = "Only platform staff can perform this action."):
+        super().__init__(detail)
+
+
+class AccountSuspendedError(ForbiddenError):
+    """The account was suspended by platform staff. Clients show the suspended screen."""
+
+    type = f"{PROBLEM_TYPE_BASE}/account-suspended"
+
+    def __init__(self, detail: str = "This account has been suspended by the platform."):
+        super().__init__(detail)
+
+
+class SuspensionDenylistUnavailableError(AppException):
+    """The Gateway denylist (Redis) could not be updated. The cause is logged, never returned."""
+
+    status_code = 503
+    title = "Service Unavailable"
+
+    def __init__(self, detail: str = "The suspension could not be applied right now. Try again later."):
         super().__init__(detail)
 
 
@@ -150,15 +205,23 @@ class AvatarUploadError(AppException):
 
 __all__ = [
     "PROBLEM_TYPE_BASE",
+    "AccountSuspendedError",
+    "AlreadyFriendsError",
     "AppException",
     "BadRequestError",
     "ConflictError",
     "EmailNotVerifiedError",
     "ForbiddenError",
+    "FriendRequestAlreadyPendingError",
+    "FriendRequestNotFoundError",
     "IdentityProviderUnavailableError",
     "NotFoundError",
     "PasswordResetThrottledError",
+    "ProfileNotAvailableError",
+    "SelfRelationError",
+    "StaffOnlyError",
     "StorageUnavailableError",
+    "SuspensionDenylistUnavailableError",
     "UnauthorizedError",
     "UnprocessableEntityError",
     "UserAlreadyExistsError",

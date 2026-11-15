@@ -9,6 +9,7 @@ on:
 jobs:
   test:
     runs-on: ubuntu-latest
+    timeout-minutes: 15
 
     services:
       postgres:
@@ -34,7 +35,7 @@ jobs:
       DATABASE_PASSWORD: postgres
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - uses: actions/setup-python@v5
         with:
@@ -58,7 +59,7 @@ jobs:
 
       - name: Upload coverage report
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: coverage-report
           path: coverage.xml
@@ -67,6 +68,7 @@ jobs:
     # PR: construye la imagen para validar el Dockerfile. Push a main/develop: además la publica en GHCR
     # con el SHA del commit (lo que se despliega) y el nombre de la rama. Sin "latest".
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     needs: test
     permissions:
       contents: read
@@ -76,9 +78,9 @@ jobs:
       PUSH: ${{ github.event_name == 'push' }}
       DOCKERHUB_USERNAME: ${{ secrets.DOCKER_USERNAME }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
-      - uses: docker/setup-buildx-action@v3
+      - uses: docker/setup-buildx-action@v4
 
       # Opcional: evita el límite de descargas anónimas de Docker Hub (imágenes base)
       - name: Log in to Docker Hub

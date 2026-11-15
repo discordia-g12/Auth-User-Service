@@ -1,24 +1,27 @@
 # Dependencias de runtime (las que instala la imagen de producción).
 # Herramientas de test/lint/seguridad: requirements-dev.txt
-fastapi==0.115.0
-uvicorn[standard]==0.31.0
-SQLAlchemy==2.0.35
-greenlet==3.5.5  # requerido por SQLAlchemy asyncio en runtime
-alembic==1.13.3
-asyncpg==0.31.0
-pydantic==2.9.2
-pydantic-settings==2.5.2
-email-validator==2.2.0  # EmailStr (recupero de contraseña)
+fastapi==0.162.2
+uvicorn[standard]==0.54.0
+SQLAlchemy==2.1.8
+greenlet==3.5.6  # requerido por SQLAlchemy asyncio en runtime
+alembic==1.20.1
+asyncpg==0.32.0
+pydantic==2.14.3
+pydantic-settings==2.16.2
+email-validator==2.3.0  # EmailStr (recupero de contraseña)
 httpx==0.28.1  # cliente de la Authentication API de Auth0
 structlog==26.1.0
 
 # Avatares (ADR-003)
-boto3==1.35.36  # S3
+boto3==1.43.126  # S3
 Pillow==10.4.0  # validación y normalización de imágenes
-python-multipart==0.0.12  # UploadFile en FastAPI
+python-multipart==0.0.33  # UploadFile en FastAPI
 
 # Broker: relay del outbox (ADR-005)
 aio-pika==9.4.3
+
+# Suspensión de usuarios (ADR-002): lista de cuentas suspendidas en el Redis del Gateway
+redis==5.2.1
 
 # Autenticación de dos factores (2FA / TOTP)
 pyotp==2.10.0
