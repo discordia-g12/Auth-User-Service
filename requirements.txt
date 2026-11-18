@@ -21,7 +21,7 @@ python-multipart==0.0.33  # UploadFile en FastAPI
 aio-pika==9.4.3
 
 # Suspensión de usuarios (ADR-002): lista de cuentas suspendidas en el Redis del Gateway
-redis==5.2.1
+redis==8.1.0
 
 # Autenticación de dos factores (2FA / TOTP)
 pyotp==2.10.0
