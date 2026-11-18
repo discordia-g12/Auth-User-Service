@@ -18,7 +18,7 @@ Pillow==10.4.0  # validación y normalización de imágenes
 python-multipart==0.0.33  # UploadFile en FastAPI
 
 # Broker: relay del outbox (ADR-005)
-aio-pika==9.4.3
+aio-pika==10.2.3
 
 # Suspensión de usuarios (ADR-002): lista de cuentas suspendidas en el Redis del Gateway
 redis==5.2.1
